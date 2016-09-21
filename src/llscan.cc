@@ -1,9 +1,9 @@
 #include <errno.h>
-#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <algorithm>
+#include <cinttypes>
 #include <fstream>
 #include <vector>
 
@@ -368,6 +368,7 @@ bool FindJSObjectsVisitor::IsAHistogramType(v8::HeapObject& heap_object,
   if (type == v8->types()->kJSObjectType) return true;
   if (type == v8->types()->kJSArrayType) return true;
   if (type == v8->types()->kJSTypedArrayType) return true;
+  if (type < v8->types()->kFirstNonstringType) return true;
   return false;
 }
 
