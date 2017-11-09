@@ -49,4 +49,4 @@ clean:
 	$(RM) -r build
 	$(RM) config.gypi
 	$(RM) lldb
-	$(RM) llnode.so llnode.dylib
+	$(RM) addon.node llnode.so llnode.dylib
