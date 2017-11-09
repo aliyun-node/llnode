@@ -39,11 +39,21 @@ bool LLNodeApi::Init(const char* filename, const char* executable) {
     LLNodeApi::debugger_initialized_ = true;
   }
 
+<<<<<<< HEAD
   if (initialized_) {
+=======
+  if (loaded) {
+>>>>>>> src: implement JavaScript API
     return false;
   }
 
   *debugger = lldb::SBDebugger::Create();
+<<<<<<< HEAD
+=======
+  loaded = true;
+
+  // Single instance target for now
+>>>>>>> src: implement JavaScript API
   *target = debugger->CreateTarget(executable);
   if (!target->IsValid()) {
     return false;
@@ -52,8 +62,11 @@ bool LLNodeApi::Init(const char* filename, const char* executable) {
   *process = target->LoadCore(filename);
   // Load V8 constants from postmortem data
   llscan->v8()->Load(*target);
+<<<<<<< HEAD
   initialized_ = true;
 
+=======
+>>>>>>> src: implement JavaScript API
   return true;
 }
 
@@ -66,7 +79,40 @@ std::string LLNodeApi::GetProcessInfo() {
 uint32_t LLNodeApi::GetProcessID() { return process->GetProcessID(); }
 
 std::string LLNodeApi::GetProcessState() {
+<<<<<<< HEAD
   return debugger->StateAsCString(process->GetState());
+=======
+  int state = process->GetState();
+
+  switch (state) {
+    case lldb::StateType::eStateInvalid:
+      return "invalid";
+    case lldb::StateType::eStateUnloaded:
+      return "unloaded";
+    case lldb::StateType::eStateConnected:
+      return "connected";
+    case lldb::StateType::eStateAttaching:
+      return "attaching";
+    case lldb::StateType::eStateLaunching:
+      return "launching";
+    case lldb::StateType::eStateStopped:
+      return "stopped";
+    case lldb::StateType::eStateRunning:
+      return "running";
+    case lldb::StateType::eStateStepping:
+      return "stepping";
+    case lldb::StateType::eStateCrashed:
+      return "crashed";
+    case lldb::StateType::eStateDetached:
+      return "detached";
+    case lldb::StateType::eStateExited:
+      return "exited";
+    case lldb::StateType::eStateSuspended:
+      return "suspended";
+    default:
+      return "unknown";
+  }
+>>>>>>> src: implement JavaScript API
 }
 
 uint32_t LLNodeApi::GetThreadCount() { return process->GetNumThreads(); }
@@ -109,13 +155,21 @@ std::string LLNodeApi::GetFrame(size_t thread_index, size_t frame_index) {
     }
   } else {
     // V8 frame
+<<<<<<< HEAD
     llnode::Error err;
+=======
+    llnode::v8::Error err;
+>>>>>>> src: implement JavaScript API
     llnode::v8::JSFrame v8_frame(llscan->v8(),
                                  static_cast<int64_t>(frame.GetFP()));
     std::string frame_str = v8_frame.Inspect(true, err);
 
     // Skip invalid frames
+<<<<<<< HEAD
     if (err.Fail() || frame_str.size() == 0 || frame_str[0] == '<') {
+=======
+    if (err.Fail() || frame_str.length() == 0 || frame_str[0] == '<') {
+>>>>>>> src: implement JavaScript API
       if (frame_str[0] == '<') {
         snprintf(buf, sizeof(buf), "Unknown: %s", frame_str.c_str());
         result += buf;
@@ -187,7 +241,11 @@ std::string LLNodeApi::GetObject(uint64_t address) {
   inspect_options.detailed = true;
   inspect_options.length = 16;
 
+<<<<<<< HEAD
   llnode::Error err;
+=======
+  v8::Error err;
+>>>>>>> src: implement JavaScript API
   std::string result = v8_value.Inspect(&inspect_options, err);
   if (err.Fail()) {
     return "Failed to get object";
