@@ -60,6 +60,9 @@ bool LLNodeApi::Init(const char* filename, const char* executable) {
   }
 
   *process = target->LoadCore(filename);
+  if (!process->IsValid()) {
+    return false;
+  }
   // Load V8 constants from postmortem data
   llscan->v8()->Load(*target);
 <<<<<<< HEAD
