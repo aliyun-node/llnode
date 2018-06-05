@@ -1,5 +1,8 @@
 #include <assert.h>
-#include <inttypes.h>
+
+#include <algorithm>
+#include <cinttypes>
+#include <cstdarg>
 
 #include "llv8-inl.h"
 #include "llv8.h"
@@ -7,7 +10,9 @@
 namespace llnode {
 namespace v8 {
 
-using namespace lldb;
+using lldb::SBError;
+using lldb::SBTarget;
+using lldb::addr_t;
 
 static std::string kConstantPrefix = "v8dbg_";
 
@@ -38,8 +43,10 @@ void LLV8::Load(SBTarget target) {
   two_byte_string.Assign(target, &common);
   cons_string.Assign(target, &common);
   sliced_string.Assign(target, &common);
+  thin_string.Assign(target, &common);
   fixed_array_base.Assign(target, &common);
   fixed_array.Assign(target, &common);
+  fixed_typed_array_base.Assign(target, &common);
   oddball.Assign(target, &common);
   js_array_buffer.Assign(target, &common);
   js_array_buffer_view.Assign(target, &common);
@@ -51,14 +58,73 @@ void LLV8::Load(SBTarget target) {
   types.Assign(target, &common);
 }
 
+bool Error::is_debug_mode = false;
+
+Error::Error(bool failed, const char* format, ...) {
+  failed_ = failed;
+  char tmp[kMaxMessageLength];
+  va_list arglist;
+  va_start(arglist, format);
+  vsnprintf(tmp, sizeof(tmp), format, arglist);
+  va_end(arglist);
+  msg_ = tmp;
+}
+
+
+void Error::PrintInDebugMode(const char* format, ...) {
+  if (!is_debug_mode) {
+    return;
+  }
+  char fmt[kMaxMessageLength];
+  snprintf(fmt, sizeof(fmt), "[llv8] %s\n", format);
+  va_list arglist;
+  va_start(arglist, format);
+  vfprintf(stderr, fmt, arglist);
+  va_end(arglist);
+}
+
+
+Error Error::Failure(std::string msg) {
+  PrintInDebugMode("%s", msg.c_str());
+  return Error(true, msg);
+}
+
+
+Error Error::Failure(const char* format, ...) {
+  char tmp[kMaxMessageLength];
+  va_list arglist;
+  va_start(arglist, format);
+  vsnprintf(tmp, sizeof(tmp), format, arglist);
+  va_end(arglist);
+  return Error::Failure(std::string(tmp));
+}
+
 
 int64_t LLV8::LoadPtr(int64_t addr, Error& err) {
   SBError sberr;
   int64_t value =
       process_.ReadPointerFromMemory(static_cast<addr_t>(addr), sberr);
   if (sberr.Fail()) {
-    // TODO(indutny): add more information
-    err = Error::Failure("Failed to load V8 value");
+    // TODO(joyeecheung): use Error::Failure() to report information when
+    // there is less noise from here.
+    err = Error(true, "Failed to load pointer from v8 memory");
+    return -1;
+  }
+
+  err = Error::Ok();
+  return value;
+}
+
+
+int64_t LLV8::LoadUnsigned(int64_t addr, uint32_t byte_size, Error& err) {
+  SBError sberr;
+  int64_t value = process_.ReadUnsignedFromMemory(static_cast<addr_t>(addr),
+                                                  byte_size, sberr);
+
+  if (sberr.Fail()) {
+    // TODO(joyeecheung): use Error::Failure() to report information when
+    // there is less noise from here.
+    err = Error(true, "Failed to load unsigned from v8 memory");
     return -1;
   }
 
@@ -72,8 +138,10 @@ double LLV8::LoadDouble(int64_t addr, Error& err) {
   int64_t value = process_.ReadUnsignedFromMemory(static_cast<addr_t>(addr),
                                                   sizeof(double), sberr);
   if (sberr.Fail()) {
-    // TODO(indutny): add more information
-    err = Error::Failure("Failed to load V8 double value");
+    err = Error::Failure(
+        "Failed to load double from v8 memory, "
+        "addr=0x%016" PRIx64,
+        addr);
     return -1.0;
   }
 
@@ -82,14 +150,44 @@ double LLV8::LoadDouble(int64_t addr, Error& err) {
 }
 
 
+std::string LLV8::LoadBytes(int64_t addr, int64_t length, Error& err) {
+  uint8_t* buf = new uint8_t[length + 1];
+  SBError sberr;
+  process_.ReadMemory(addr, buf, static_cast<size_t>(length), sberr);
+  if (sberr.Fail()) {
+    err = Error::Failure(
+        "Failed to load v8 backing store memory, "
+        "addr=0x%016" PRIx64 ", length=%" PRId64,
+        addr, length);
+    delete[] buf;
+    return std::string();
+  }
+
+  std::string res;
+  char tmp[10];
+  for (int i = 0; i < length; ++i) {
+    snprintf(tmp, sizeof(tmp), "%s%02x", (i == 0 ? "" : ", "), buf[i]);
+    res += tmp;
+  }
+  delete[] buf;
+  return res;
+}
+
 std::string LLV8::LoadString(int64_t addr, int64_t length, Error& err) {
+  if (length < 0) {
+    err = Error::Failure("Failed to load V8 one byte string - Invalid length");
+    return std::string();
+  }
+
   char* buf = new char[length + 1];
   SBError sberr;
   process_.ReadMemory(static_cast<addr_t>(addr), buf,
                       static_cast<size_t>(length), sberr);
   if (sberr.Fail()) {
-    // TODO(indutny): add more information
-    err = Error::Failure("Failed to load V8 one byte string");
+    err = Error::Failure(
+        "Failed to load v8 one byte string memory, "
+        "addr=0x%016" PRIx64 ", length=%" PRId64,
+        addr, length);
     delete[] buf;
     return std::string();
   }
@@ -104,13 +202,20 @@ std::string LLV8::LoadString(int64_t addr, int64_t length, Error& err) {
 
 
 std::string LLV8::LoadTwoByteString(int64_t addr, int64_t length, Error& err) {
+  if (length < 0) {
+    err = Error::Failure("Failed to load V8 two byte string - Invalid length");
+    return std::string();
+  }
+
   char* buf = new char[length * 2 + 1];
   SBError sberr;
   process_.ReadMemory(static_cast<addr_t>(addr), buf,
                       static_cast<size_t>(length * 2), sberr);
   if (sberr.Fail()) {
-    // TODO(indutny): add more information
-    err = Error::Failure("Failed to load V8 one byte string");
+    err = Error::Failure(
+        "Failed to load V8 two byte string memory, "
+        "addr=0x%016" PRIx64 ", length=%" PRId64,
+        addr, length);
     delete[] buf;
     return std::string();
   }
@@ -131,8 +236,10 @@ uint8_t* LLV8::LoadChunk(int64_t addr, int64_t length, Error& err) {
   process_.ReadMemory(static_cast<addr_t>(addr), buf,
                       static_cast<size_t>(length), sberr);
   if (sberr.Fail()) {
-    // TODO(indutny): add more information
-    err = Error::Failure("Failed to load V8 memory chunk");
+    err = Error::Failure(
+        "Failed to load V8 chunk memory, "
+        "addr=0x%016" PRIx64 ", length=%" PRId64,
+        addr, length);
     delete[] buf;
     return nullptr;
   }
@@ -183,19 +290,33 @@ uint32_t JSFrame::GetSourceForDisplay(bool reset_line, uint32_t line_start,
   if (err.Fail()) {
     const char* msg = err.GetMessage();
     if (msg == nullptr) {
-      err = Error(true, "Failed to get Function Source");
+      err = Error::Failure("Failed to get Function Source");
     }
     return line_start;
   }
   return line_start + lines_found;
 }
 
+
+// On 64 bits systems, V8 stores SMIs (small ints) in the top 32 bits of
+// a 64 bits word.  Frame markers used to obey this convention but as of
+// V8 5.8, they are stored as 32 bits SMIs with the top half set to zero.
+// Shift the raw value up to make it a normal SMI again.
+Smi JSFrame::FromFrameMarker(Value value) const {
+  if (v8()->smi()->kShiftSize == 31 && Smi(value).Check() &&
+      value.raw() < 1LL << 31) {
+    value = Value(v8(), value.raw() << 31);
+  }
+  return Smi(value);
+}
+
+
 std::string JSFrame::Inspect(bool with_args, Error& err) {
   Value context =
       v8()->LoadValue<Value>(raw() + v8()->frame()->kContextOffset, err);
   if (err.Fail()) return std::string();
 
-  Smi smi_context = Smi(context);
+  Smi smi_context = FromFrameMarker(context);
   if (smi_context.Check() &&
       smi_context.GetValue() == v8()->frame()->kAdaptorFrame) {
     return "<adaptor>";
@@ -205,7 +326,7 @@ std::string JSFrame::Inspect(bool with_args, Error& err) {
       v8()->LoadValue<Value>(raw() + v8()->frame()->kMarkerOffset, err);
   if (err.Fail()) return std::string();
 
-  Smi smi_marker(marker);
+  Smi smi_marker = FromFrameMarker(marker);
   if (smi_marker.Check()) {
     int64_t value = smi_marker.GetValue();
     if (value == v8()->frame()->kEntryFrame) {
@@ -218,9 +339,11 @@ std::string JSFrame::Inspect(bool with_args, Error& err) {
       return "<internal>";
     } else if (value == v8()->frame()->kConstructFrame) {
       return "<constructor>";
+    } else if (value == v8()->frame()->kStubFrame) {
+      return "<stub>";
     } else if (value != v8()->frame()->kJSFrame &&
                value != v8()->frame()->kOptimizedFrame) {
-      err = Error::Failure("Unknown frame marker");
+      err = Error::Failure("Unknown frame marker %" PRId64, value);
       return std::string();
     }
   }
@@ -312,9 +435,87 @@ std::string JSFunction::Inspect(InspectOptions* options, Error& err) {
     if (err.Fail()) return std::string();
 
     if (!context_str.empty()) res += "{\n" + context_str + "}";
+
+    if (options->print_source) {
+      SharedFunctionInfo info = Info(err);
+      if (err.Fail()) return res;
+
+      std::string name_str = info.ProperName(err);
+      if (err.Fail()) return res;
+
+      std::string source = GetSource(err);
+      if (!err.Fail()) {
+        res += "\n  source:\n";
+        // name_str may be an empty string but that will match
+        // the syntax for an anonymous function declaration correctly.
+        res += "function " + name_str;
+        res += source + "\n";
+      }
+    }
   }
 
   return res + ">";
+}
+
+
+std::string JSFunction::GetSource(Error& err) {
+  v8::SharedFunctionInfo info = Info(err);
+  if (err.Fail()) {
+    return std::string();
+  }
+
+  v8::Script script = info.GetScript(err);
+  if (err.Fail()) {
+    return std::string();
+  }
+
+  // There is no `Script` for functions created in C++ (and possibly others)
+  int64_t type = script.GetType(err);
+  if (err.Fail()) {
+    return std::string();
+  }
+
+  if (type != v8()->types()->kScriptType) {
+    return std::string();
+  }
+
+  HeapObject source = script.Source(err);
+  if (err.Fail()) return std::string();
+
+  int64_t source_type = source.GetType(err);
+  if (err.Fail()) return std::string();
+
+  // No source
+  if (source_type > v8()->types()->kFirstNonstringType) {
+    err = Error::Failure("No source, source_type=%" PRId64, source_type);
+    return std::string();
+  }
+
+  String str(source);
+  std::string source_str = str.ToString(err);
+
+  int64_t start_pos = info.StartPosition(err);
+
+  if (err.Fail()) {
+    return std::string();
+  }
+
+  int64_t end_pos = info.EndPosition(err);
+
+  if (err.Fail()) {
+    return std::string();
+  }
+
+  int64_t source_len = source_str.length();
+
+  if (end_pos > source_len) {
+    end_pos = source_len;
+  }
+  int64_t len = end_pos - start_pos;
+
+  std::string res = source_str.substr(start_pos, len);
+
+  return res;
 }
 
 
@@ -378,10 +579,12 @@ std::string SharedFunctionInfo::ProperName(Error& err) {
 
   std::string res = name.ToString(err);
   if (err.Fail() || res.empty()) {
-    name = InferredName(err);
+    Value inferred = InferredName(err);
     if (err.Fail()) return std::string();
 
-    res = name.ToString(err);
+    // Function may not have inferred name
+    if (!inferred.IsHoleOrUndefined(err) && !err.Fail())
+      res = inferred.ToString(err);
     if (err.Fail()) return std::string();
   }
 
@@ -394,6 +597,11 @@ std::string SharedFunctionInfo::ProperName(Error& err) {
 std::string SharedFunctionInfo::GetPostfix(Error& err) {
   Script script = GetScript(err);
   if (err.Fail()) return std::string();
+
+  // There is no `Script` for functions created in C++ (and possibly others)
+  int64_t type = script.GetType(err);
+  if (err.Fail() || type != v8()->types()->kScriptType)
+    return std::string("(no script)");
 
   String name = script.Name(err);
   if (err.Fail()) return std::string();
@@ -438,7 +646,7 @@ void Script::GetLines(uint64_t start_line, std::string lines[],
 
   // No source
   if (type > v8()->types()->kFirstNonstringType) {
-    err = Error(true, "No source");
+    err = Error::Failure("No source, source_type=%" PRId64, type);
     return;
   }
 
@@ -549,7 +757,7 @@ std::string Value::Inspect(InspectOptions* options, Error& err) {
 }
 
 
-std::string Value::GetTypeName(InspectOptions* options, Error& err) {
+std::string Value::GetTypeName(Error& err) {
   Smi smi(this);
   if (smi.Check()) return "(Smi)";
 
@@ -559,7 +767,7 @@ std::string Value::GetTypeName(InspectOptions* options, Error& err) {
     return std::string();
   }
 
-  return obj.GetTypeName(options, err);
+  return obj.GetTypeName(err);
 }
 
 
@@ -613,13 +821,14 @@ std::string HeapObject::Inspect(InspectOptions* options, Error& err) {
   std::string pre = buf;
 
   if (type == v8()->types()->kGlobalObjectType) return pre + "<Global>";
+  if (type == v8()->types()->kGlobalProxyType) return pre + "<Global proxy>";
   if (type == v8()->types()->kCodeType) return pre + "<Code>";
   if (type == v8()->types()->kMapType) {
     Map m(this);
     return pre + m.Inspect(options, err);
   }
 
-  if (type == v8()->types()->kJSObjectType) {
+  if (JSObject::IsObjectType(v8(), type)) {
     JSObject o(this);
     return pre + o.Inspect(options, err);
   }
@@ -661,12 +870,12 @@ std::string HeapObject::Inspect(InspectOptions* options, Error& err) {
 
   if (type == v8()->types()->kJSArrayBufferType) {
     JSArrayBuffer buf(this);
-    return pre + buf.Inspect(err);
+    return pre + buf.Inspect(options, err);
   }
 
   if (type == v8()->types()->kJSTypedArrayType) {
     JSArrayBufferView view(this);
-    return pre + view.Inspect(err);
+    return pre + view.Inspect(options, err);
   }
 
   if (type == v8()->types()->kJSDateType) {
@@ -674,6 +883,8 @@ std::string HeapObject::Inspect(InspectOptions* options, Error& err) {
     return pre + date.Inspect(err);
   }
 
+  Error::PrintInDebugMode(
+      "Unknown HeapObject Type %" PRId64 " at 0x%016" PRIx64 "", type, raw());
   return pre + "<unknown>";
 }
 
@@ -688,15 +899,16 @@ std::string Smi::ToString(Error& err) {
 
 /* Utility function to generate short type names for objects.
  */
-std::string HeapObject::GetTypeName(InspectOptions* options, Error& err) {
+std::string HeapObject::GetTypeName(Error& err) {
   int64_t type = GetType(err);
   if (type == v8()->types()->kGlobalObjectType) return "(Global)";
+  if (type == v8()->types()->kGlobalProxyType) return "(Global proxy)";
   if (type == v8()->types()->kCodeType) return "(Code)";
   if (type == v8()->types()->kMapType) {
     return "(Map)";
   }
 
-  if (type == v8()->types()->kJSObjectType) {
+  if (JSObject::IsObjectType(v8(), type)) {
     v8::HeapObject map_obj = GetMap(err);
     if (err.Fail()) {
       return std::string();
@@ -801,7 +1013,7 @@ std::string String::ToString(Error& err) {
       return two.ToString(err);
     }
 
-    err = Error::Failure("Unsupported seq string encoding");
+    err = Error::Failure("Unsupported seq string encoding %" PRId64, encoding);
     return std::string();
   }
 
@@ -820,7 +1032,12 @@ std::string String::ToString(Error& err) {
     return std::string("(external)");
   }
 
-  err = Error::Failure("Unsupported string representation");
+  if (repr == v8()->string()->kThinStringTag) {
+    ThinString thin(this);
+    return thin.ToString(err);
+  }
+
+  err = Error::Failure("Unsupported string representation %" PRId64, repr);
   return std::string();
 }
 
@@ -829,7 +1046,7 @@ std::string String::Inspect(InspectOptions* options, Error& err) {
   std::string val = ToString(err);
   if (err.Fail()) return std::string();
 
-  unsigned int len = options->string_length;
+  unsigned int len = options->length;
 
   if (len != 0 && val.length() > len) val = val.substr(0, len) + "...";
 
@@ -958,8 +1175,7 @@ std::string Oddball::Inspect(Error& err) {
   return "<Oddball>";
 }
 
-
-std::string JSArrayBuffer::Inspect(Error& err) {
+std::string JSArrayBuffer::Inspect(InspectOptions* options, Error& err) {
   bool neutered = WasNeutered(err);
   if (err.Fail()) return std::string();
 
@@ -971,14 +1187,34 @@ std::string JSArrayBuffer::Inspect(Error& err) {
   Smi length = ByteLength(err);
   if (err.Fail()) return std::string();
 
+  int byte_length = static_cast<int>(length.GetValue());
+
   char tmp[128];
-  snprintf(tmp, sizeof(tmp), "<ArrayBuffer 0x%016" PRIx64 ":%d>", data,
-           static_cast<int>(length.GetValue()));
-  return tmp;
+  snprintf(tmp, sizeof(tmp),
+           "<ArrayBuffer: backingStore=0x%016" PRIx64 ", byteLength=%d", data,
+           byte_length);
+
+  std::string res;
+  res += tmp;
+  if (options->detailed) {
+    res += ": [\n  ";
+
+    int display_length = std::min<int>(byte_length, options->length);
+    res += v8()->LoadBytes(data, display_length, err);
+
+    if (display_length < byte_length) {
+      res += " ...";
+    }
+    res += "\n]>";
+  } else {
+    res += ">";
+  }
+
+  return res;
 }
 
 
-std::string JSArrayBufferView::Inspect(Error& err) {
+std::string JSArrayBufferView::Inspect(InspectOptions* options, Error& err) {
   JSArrayBuffer buf = Buffer(err);
   if (err.Fail()) return std::string();
 
@@ -990,17 +1226,48 @@ std::string JSArrayBufferView::Inspect(Error& err) {
   int64_t data = buf.BackingStore(err);
   if (err.Fail()) return std::string();
 
+  if (data == 0) {
+    // The backing store has not been materialized yet.
+    HeapObject elements_obj = Elements(err);
+    if (err.Fail()) return std::string();
+    FixedTypedArrayBase elements(elements_obj);
+    int64_t base = elements.GetBase(err);
+    if (err.Fail()) return std::string();
+    int64_t external = elements.GetExternal(err);
+    if (err.Fail()) return std::string();
+    data = base + external;
+  }
+
   Smi off = ByteOffset(err);
   if (err.Fail()) return std::string();
 
   Smi length = ByteLength(err);
   if (err.Fail()) return std::string();
 
+  int byte_length = static_cast<int>(length.GetValue());
+  int byte_offset = static_cast<int>(off.GetValue());
   char tmp[128];
-  snprintf(tmp, sizeof(tmp), "<ArrayBufferView 0x%016" PRIx64 "+%d:%d>", data,
-           static_cast<int>(off.GetValue()),
-           static_cast<int>(length.GetValue()));
-  return tmp;
+  snprintf(tmp, sizeof(tmp),
+           "<ArrayBufferView: backingStore=0x%016" PRIx64
+           ", byteOffset=%d, byteLength=%d",
+           data, byte_offset, byte_length);
+
+  std::string res;
+  res += tmp;
+  if (options->detailed) {
+    res += ": [\n  ";
+
+    int display_length = std::min<int>(byte_length, options->length);
+    res += v8()->LoadBytes(data + byte_offset, display_length, err);
+
+    if (display_length < byte_length) {
+      res += " ...";
+    }
+    res += "\n]>";
+  } else {
+    res += ">";
+  }
+  return res;
 }
 
 
@@ -1076,9 +1343,55 @@ std::string JSObject::Inspect(InspectOptions* options, Error& err) {
   if (options->detailed) {
     res += " " + InspectProperties(err);
     if (err.Fail()) return std::string();
+
+    std::string fields = InspectInternalFields(err);
+    if (err.Fail()) return std::string();
+
+    if (!fields.empty()) res += "\n  internal fields {\n" + fields + "}";
   }
 
   res += ">";
+  return res;
+}
+
+
+std::string JSObject::InspectInternalFields(Error& err) {
+  HeapObject map_obj = GetMap(err);
+  if (err.Fail()) return std::string();
+
+  Map map(map_obj);
+  int64_t type = map.GetType(err);
+  if (err.Fail()) return std::string();
+
+  // Only JSObject for now
+  if (!JSObject::IsObjectType(v8(), type)) return std::string();
+
+  int64_t instance_size = map.InstanceSize(err);
+
+  // kVariableSizeSentinel == 0
+  // TODO(indutny): post-mortem constant for this?
+  if (err.Fail() || instance_size == 0) return std::string();
+
+  int64_t in_object_props = map.InObjectProperties(err);
+  if (err.Fail()) return std::string();
+
+  // in-object properties are appended to the end of the JSObject,
+  // skip them.
+  instance_size -= in_object_props * v8()->common()->kPointerSize;
+
+  std::string res;
+  for (int64_t off = v8()->js_object()->kInternalFieldsOffset;
+       off < instance_size; off += v8()->common()->kPointerSize) {
+    int64_t field = LoadField(off, err);
+    if (err.Fail()) return std::string();
+
+    char tmp[128];
+    snprintf(tmp, sizeof(tmp), "    0x%016" PRIx64, field);
+
+    if (!res.empty()) res += ",\n  ";
+    res += tmp;
+  }
+
   return res;
 }
 
@@ -1125,9 +1438,18 @@ std::string JSObject::InspectElements(Error& err) {
   Smi length_smi = elements.Length(err);
   if (err.Fail()) return std::string();
 
+  int64_t length = length_smi.GetValue();
+  return InspectElements(length, err);
+}
+
+
+std::string JSObject::InspectElements(int64_t length, Error& err) {
+  HeapObject elements_obj = Elements(err);
+  if (err.Fail()) return std::string();
+  FixedArray elements(elements_obj);
+
   InspectOptions options;
 
-  int64_t length = length_smi.GetValue();
   std::string res;
   for (int64_t i = 0; i < length; i++) {
     Value value = elements.Get<Value>(i, err);
@@ -1237,6 +1559,8 @@ std::string JSObject::InspectDescriptors(Map map, Error& err) {
 
     // Skip non-fields for now
     if (!descriptors.IsFieldDetails(details)) {
+      Error::PrintInDebugMode("Unknown field Type %" PRId64,
+                              details.GetValue());
       res += "<unknown field type>";
       continue;
     }
@@ -1279,13 +1603,414 @@ T JSObject::GetInObjectValue(int64_t size, int index, Error& err) {
 }
 
 
+/* Returns the set of keys on an object - similar to Object.keys(obj) in
+ * Javascript. That includes array indices but not special fields like
+ * "length" on an array.
+ */
+void JSObject::Keys(std::vector<std::string>& keys, Error& err) {
+  keys.clear();
+
+  // First handle array indices.
+  ElementKeys(keys, err);
+
+  HeapObject map_obj = GetMap(err);
+
+  Map map(map_obj);
+
+  bool is_dict = map.IsDictionary(err);
+  if (err.Fail()) return;
+
+  if (is_dict) {
+    DictionaryKeys(keys, err);
+  } else {
+    DescriptorKeys(keys, map, err);
+  }
+
+  return;
+}
+
+
+std::vector<std::pair<Value, Value>> JSObject::Entries(Error& err) {
+  HeapObject map_obj = GetMap(err);
+
+  Map map(map_obj);
+
+  bool is_dict = map.IsDictionary(err);
+  if (err.Fail()) return {};
+
+  if (is_dict) {
+    return DictionaryEntries(err);
+  } else {
+    return DescriptorEntries(map, err);
+  }
+}
+
+
+std::vector<std::pair<Value, Value>> JSObject::DictionaryEntries(Error& err) {
+  HeapObject dictionary_obj = Properties(err);
+  if (err.Fail()) return {};
+
+  NameDictionary dictionary(dictionary_obj);
+
+  int64_t length = dictionary.Length(err);
+  if (err.Fail()) return {};
+
+  std::vector<std::pair<Value, Value>> entries;
+  for (int64_t i = 0; i < length; i++) {
+    Value key = dictionary.GetKey(i, err);
+
+    if (err.Fail()) return entries;
+
+    // Skip holes
+    bool is_hole = key.IsHoleOrUndefined(err);
+    if (err.Fail()) return entries;
+    if (is_hole) continue;
+
+    Value value = dictionary.GetValue(i, err);
+
+    entries.push_back(std::pair<Value, Value>(key, value));
+  }
+  return entries;
+}
+
+
+std::vector<std::pair<Value, Value>> JSObject::DescriptorEntries(Map map,
+                                                                 Error& err) {
+  HeapObject descriptors_obj = map.InstanceDescriptors(err);
+  if (err.Fail()) return {};
+
+  DescriptorArray descriptors(descriptors_obj);
+
+  int64_t own_descriptors_count = map.NumberOfOwnDescriptors(err);
+  if (err.Fail()) return {};
+
+  int64_t in_object_count = map.InObjectProperties(err);
+  if (err.Fail()) return {};
+
+  int64_t instance_size = map.InstanceSize(err);
+  if (err.Fail()) return {};
+
+  HeapObject extra_properties_obj = Properties(err);
+  if (err.Fail()) return {};
+
+  FixedArray extra_properties(extra_properties_obj);
+
+  std::vector<std::pair<Value, Value>> entries;
+  for (int64_t i = 0; i < own_descriptors_count; i++) {
+    Smi details = descriptors.GetDetails(i, err);
+    if (err.Fail()) continue;
+
+    Value key = descriptors.GetKey(i, err);
+    if (err.Fail()) continue;
+
+    if (descriptors.IsConstFieldDetails(details)) {
+      Value value;
+
+      value = descriptors.GetValue(i, err);
+      if (err.Fail()) continue;
+
+      entries.push_back(std::pair<Value, Value>(key, value));
+      continue;
+    }
+
+    // Skip non-fields for now, Object.keys(obj) does
+    // not seem to return these (for example the "length"
+    // field on an array).
+    if (!descriptors.IsFieldDetails(details)) continue;
+
+    if (descriptors.IsDoubleField(details)) continue;
+
+    int64_t index = descriptors.FieldIndex(details) - in_object_count;
+
+    Value value;
+    if (index < 0) {
+      value = GetInObjectValue<Value>(instance_size, index, err);
+    } else {
+      value = extra_properties.Get<Value>(index, err);
+    }
+
+    entries.push_back(std::pair<Value, Value>(key, value));
+  }
+
+  return entries;
+}
+
+
+void JSObject::ElementKeys(std::vector<std::string>& keys, Error& err) {
+  HeapObject elements_obj = Elements(err);
+  if (err.Fail()) return;
+
+  FixedArray elements(elements_obj);
+
+  Smi length_smi = elements.Length(err);
+  if (err.Fail()) return;
+
+  int64_t length = length_smi.GetValue();
+  for (int i = 0; i < length; ++i) {
+    // Add keys for anything that isn't a hole.
+    Value value = elements.Get<Value>(i, err);
+    if (err.Fail()) continue;
+    ;
+
+    bool is_hole = value.IsHole(err);
+    if (err.Fail()) continue;
+    if (!is_hole) {
+      keys.push_back(std::to_string(i));
+    }
+  }
+}
+
+void JSObject::DictionaryKeys(std::vector<std::string>& keys, Error& err) {
+  HeapObject dictionary_obj = Properties(err);
+  if (err.Fail()) return;
+
+  NameDictionary dictionary(dictionary_obj);
+
+  int64_t length = dictionary.Length(err);
+  if (err.Fail()) return;
+
+  for (int64_t i = 0; i < length; i++) {
+    Value key = dictionary.GetKey(i, err);
+    if (err.Fail()) return;
+
+    // Skip holes
+    bool is_hole = key.IsHoleOrUndefined(err);
+    if (err.Fail()) return;
+    if (is_hole) continue;
+
+    std::string key_name = key.ToString(err);
+    if (err.Fail()) {
+      // TODO - should I continue onto the next key here instead.
+      return;
+    }
+
+    keys.push_back(key_name);
+  }
+}
+
+void JSObject::DescriptorKeys(std::vector<std::string>& keys, Map map,
+                              Error& err) {
+  HeapObject descriptors_obj = map.InstanceDescriptors(err);
+  if (err.Fail()) return;
+
+  DescriptorArray descriptors(descriptors_obj);
+  int64_t own_descriptors_count = map.NumberOfOwnDescriptors(err);
+  if (err.Fail()) return;
+
+  for (int64_t i = 0; i < own_descriptors_count; i++) {
+    Smi details = descriptors.GetDetails(i, err);
+    if (err.Fail()) return;
+
+    Value key = descriptors.GetKey(i, err);
+    if (err.Fail()) return;
+
+    // Skip non-fields for now, Object.keys(obj) does
+    // not seem to return these (for example the "length"
+    // field on an array).
+    if (!descriptors.IsFieldDetails(details)) {
+      continue;
+    }
+
+    std::string key_name = key.ToString(err);
+    if (err.Fail()) {
+      // TODO - should I continue onto the next key here instead.
+      return;
+    }
+
+    keys.push_back(key_name);
+  }
+}
+
+/* Return the v8 value for a property stored using the given key.
+ * (Caller should have some idea of what type of object will be stored
+ * in that key, they will get a v8::Value back that they can cast.)
+ */
+Value JSObject::GetProperty(std::string key_name, Error& err) {
+  HeapObject map_obj = GetMap(err);
+  if (err.Fail()) Value();
+
+  Map map(map_obj);
+
+  bool is_dict = map.IsDictionary(err);
+  if (err.Fail()) return Value();
+
+  if (is_dict) {
+    return GetDictionaryProperty(key_name, err);
+  } else {
+    return GetDescriptorProperty(key_name, map, err);
+  }
+
+  if (err.Fail()) return Value();
+
+  // Nothing's gone wrong, we just didn't find the key.
+  return Value();
+}
+
+Value JSObject::GetDictionaryProperty(std::string key_name, Error& err) {
+  HeapObject dictionary_obj = Properties(err);
+  if (err.Fail()) return Value();
+
+  NameDictionary dictionary(dictionary_obj);
+
+  int64_t length = dictionary.Length(err);
+  if (err.Fail()) return Value();
+
+  for (int64_t i = 0; i < length; i++) {
+    Value key = dictionary.GetKey(i, err);
+    if (err.Fail()) return Value();
+
+    // Skip holes
+    bool is_hole = key.IsHoleOrUndefined(err);
+    if (err.Fail()) return Value();
+    if (is_hole) continue;
+
+    if (key.ToString(err) == key_name) {
+      Value value = dictionary.GetValue(i, err);
+
+      if (err.Fail()) return Value();
+
+      return value;
+    }
+  }
+  return Value();
+}
+
+Value JSObject::GetDescriptorProperty(std::string key_name, Map map,
+                                      Error& err) {
+  HeapObject descriptors_obj = map.InstanceDescriptors(err);
+  if (err.Fail()) return Value();
+
+  DescriptorArray descriptors(descriptors_obj);
+  int64_t own_descriptors_count = map.NumberOfOwnDescriptors(err);
+  if (err.Fail()) return Value();
+
+  int64_t in_object_count = map.InObjectProperties(err);
+  if (err.Fail()) return Value();
+
+  int64_t instance_size = map.InstanceSize(err);
+  if (err.Fail()) return Value();
+
+  HeapObject extra_properties_obj = Properties(err);
+  if (err.Fail()) return Value();
+
+  FixedArray extra_properties(extra_properties_obj);
+
+  for (int64_t i = 0; i < own_descriptors_count; i++) {
+    Smi details = descriptors.GetDetails(i, err);
+    if (err.Fail()) return Value();
+
+    Value key = descriptors.GetKey(i, err);
+    if (err.Fail()) return Value();
+
+    if (key.ToString(err) != key_name) {
+      continue;
+    }
+
+    // Found the right key, get the value.
+    if (err.Fail()) return Value();
+
+    if (descriptors.IsConstFieldDetails(details)) {
+      Value value;
+
+      value = descriptors.GetValue(i, err);
+      if (err.Fail()) return Value();
+
+      continue;
+    }
+
+    // Skip non-fields for now
+    if (!descriptors.IsFieldDetails(details)) {
+      // This path would return the length field for an array,
+      // however Object.keys(arr) doesn't return length as a
+      // field so neither do we.
+      continue;
+    }
+
+    int64_t index = descriptors.FieldIndex(details) - in_object_count;
+
+    if (descriptors.IsDoubleField(details)) {
+      double value;
+      if (index < 0) {
+        value = GetInObjectValue<double>(instance_size, index, err);
+      } else {
+        value = extra_properties.Get<double>(index, err);
+      }
+
+      if (err.Fail()) return Value();
+
+    } else {
+      Value value;
+      if (index < 0) {
+        value = GetInObjectValue<Value>(instance_size, index, err);
+      } else {
+        value = extra_properties.Get<Value>(index, err);
+      }
+
+      if (err.Fail()) {
+        return Value();
+      } else {
+        return value;
+      };
+    }
+    if (err.Fail()) return Value();
+  }
+  return Value();
+}
+
+
+/* An array is also an object so this method is on JSObject
+ * not JSArray.
+ */
+int64_t JSObject::GetArrayLength(Error& err) {
+  HeapObject elements_obj = Elements(err);
+  if (err.Fail()) return 0;
+
+  FixedArray elements(elements_obj);
+  Smi length_smi = elements.Length(err);
+  if (err.Fail()) return 0;
+
+  int64_t length = length_smi.GetValue();
+  return length;
+}
+
+
+/* An array is also an object so this method is on JSObject
+ * not JSArray.
+ * Note that you the user should know what the expect the array to contain
+ * and should check they haven't been returned a hole.
+ */
+v8::Value JSObject::GetArrayElement(int64_t pos, Error& err) {
+  if (pos < 0) {
+    // TODO - Set err.Fail()?
+    return Value();
+  }
+
+  HeapObject elements_obj = Elements(err);
+  if (err.Fail()) return Value();
+
+  FixedArray elements(elements_obj);
+  Smi length_smi = elements.Length(err);
+  if (err.Fail()) return Value();
+
+  int64_t length = length_smi.GetValue();
+  if (pos >= length) {
+    return Value();
+  }
+
+  Value value = elements.Get<v8::Value>(pos, err);
+  if (err.Fail()) return Value();
+
+  return value;
+}
+
 std::string JSArray::Inspect(InspectOptions* options, Error& err) {
-  Smi length = Length(err);
+  int64_t length = GetArrayLength(err);
   if (err.Fail()) return std::string();
 
-  std::string res = "<Array: length=" + length.ToString(err);
+  std::string res = "<Array: length=" + std::to_string(length);
   if (options->detailed) {
-    std::string elems = InspectElements(err);
+    int64_t display_length = std::min<int64_t>(length, options->length);
+    std::string elems = InspectElements(display_length, err);
     if (err.Fail()) return std::string();
 
     if (!elems.empty()) res += " {\n" + elems + "}";

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <cinttypes>
 #include <string>
 
 #include <lldb/API/SBExpressionOptions.h>
@@ -12,17 +13,16 @@ namespace llnode {
 namespace v8 {
 namespace constants {
 
-using namespace lldb;
+using lldb::SBAddress;
+using lldb::SBError;
+using lldb::SBProcess;
+using lldb::SBSymbol;
+using lldb::SBSymbolContext;
+using lldb::SBSymbolContextList;
+using lldb::SBTarget;
+using lldb::addr_t;
 
 static std::string kConstantPrefix = "v8dbg_";
-
-static bool IsDebugMode() {
-  char* var = getenv("LLNODE_DEBUG");
-  if (var == nullptr) return false;
-
-  return strlen(var) != 0;
-}
-
 
 void Module::Assign(SBTarget target, Common* common) {
   loaded_ = false;
@@ -31,58 +31,59 @@ void Module::Assign(SBTarget target, Common* common) {
 }
 
 
+template <typename T>
+T ReadSymbolFromTarget(SBTarget& target, SBAddress& start, const char* name,
+                       Error& err) {
+  SBError sberr;
+  T res = 0;
+  target.ReadMemory(start, &res, sizeof(T), sberr);
+  if (!sberr.Fail()) {
+    err = Error::Ok();
+  } else {
+    err = Error::Failure("Failed to read symbol %s", name);
+  }
+  return res;
+}
+
 static int64_t LookupConstant(SBTarget target, const char* name, int64_t def,
                               Error& err) {
-  int64_t res;
-
+  int64_t res = 0;
   res = def;
 
   SBSymbolContextList context_list = target.FindSymbols(name);
+
   if (!context_list.IsValid() || context_list.GetSize() == 0) {
-    err = Error::Failure("Failed to find symbol");
+    err = Error::Failure("Failed to find symbol %s", name);
     return res;
   }
 
   SBSymbolContext context = context_list.GetContextAtIndex(0);
   SBSymbol symbol = context.GetSymbol();
   if (!symbol.IsValid()) {
-    err = Error::Failure("Failed to fetch symbol");
+    err = Error::Failure("Failed to fetch symbol %s from context", name);
     return res;
   }
 
   SBAddress start = symbol.GetStartAddress();
   SBAddress end = symbol.GetEndAddress();
-  size_t size = end.GetOffset() - start.GetOffset();
-
-  SBError sberr;
-
-  SBProcess process = target.GetProcess();
-  addr_t addr = start.GetLoadAddress(target);
+  uint32_t size = end.GetOffset() - start.GetOffset();
 
   // NOTE: size could be bigger for at the end symbols
   if (size >= 8) {
-    process.ReadMemory(addr, &res, 8, sberr);
+    res = ReadSymbolFromTarget<int64_t>(target, start, name, err);
   } else if (size == 4) {
-    int32_t tmp;
-    process.ReadMemory(addr, &tmp, size, sberr);
+    int32_t tmp = ReadSymbolFromTarget<int32_t>(target, start, name, err);
     res = static_cast<int64_t>(tmp);
   } else if (size == 2) {
-    int16_t tmp;
-    process.ReadMemory(addr, &tmp, size, sberr);
+    int16_t tmp = ReadSymbolFromTarget<int16_t>(target, start, name, err);
     res = static_cast<int64_t>(tmp);
   } else if (size == 1) {
-    int8_t tmp;
-    process.ReadMemory(addr, &tmp, size, sberr);
+    int8_t tmp = ReadSymbolFromTarget<int8_t>(target, start, name, err);
     res = static_cast<int64_t>(tmp);
   } else {
-    err = Error::Failure("Unexpected symbol size");
-    return res;
+    err = Error::Failure("Unexpected symbol size %" PRIu32 " of symbol %s",
+                         size, name);
   }
-
-  if (sberr.Fail())
-    err = Error::Failure("Failed to load symbol");
-  else
-    err = Error::Ok();
 
   return res;
 }
@@ -91,30 +92,41 @@ static int64_t LookupConstant(SBTarget target, const char* name, int64_t def,
 int64_t Module::LoadRawConstant(const char* name, int64_t def) {
   Error err;
   int64_t v = LookupConstant(target_, name, def, err);
-  if (err.Fail() && IsDebugMode()) fprintf(stderr, "Failed to load %s\n", name);
+  if (err.Fail()) {
+    Error::PrintInDebugMode(
+        "Failed to load raw constant %s, default to %" PRId64, name, def);
+  }
 
   return v;
 }
 
+int64_t Module::LoadConstant(const char* name, Error& err, int64_t def) {
+  int64_t v =
+      LookupConstant(target_, (kConstantPrefix + name).c_str(), def, err);
+  return v;
+}
 
 int64_t Module::LoadConstant(const char* name, int64_t def) {
   Error err;
-  int64_t v =
-      LookupConstant(target_, (kConstantPrefix + name).c_str(), def, err);
-  if (err.Fail() && IsDebugMode()) fprintf(stderr, "Failed to load %s\n", name);
+  int64_t v = LoadConstant(name, err, def);
+  if (err.Fail()) {
+    Error::PrintInDebugMode("Failed to load constant %s, default to %" PRId64,
+                            name, def);
+  }
 
   return v;
 }
-
 
 int64_t Module::LoadConstant(const char* name, const char* fallback,
                              int64_t def) {
   Error err;
-  int64_t v =
-      LookupConstant(target_, (kConstantPrefix + name).c_str(), def, err);
-  if (err.Fail())
-    v = LookupConstant(target_, (kConstantPrefix + fallback).c_str(), def, err);
-  if (err.Fail() && IsDebugMode()) fprintf(stderr, "Failed to load %s\n", name);
+  int64_t v = LoadConstant(name, err, def);
+  if (err.Fail()) v = LoadConstant(fallback, err, def);
+  if (err.Fail()) {
+    Error::PrintInDebugMode(
+        "Failed to load constant %s, fallback %s, default to %" PRId64, name,
+        fallback, def);
+  }
 
   return v;
 }
@@ -124,15 +136,34 @@ void Common::Load() {
   kPointerSize = 1 << LoadConstant("PointerSizeLog2");
   kVersionMajor = LoadRawConstant("v8::internal::Version::major_");
   kVersionMinor = LoadRawConstant("v8::internal::Version::minor_");
+  kVersionPatch = LoadRawConstant("v8::internal::Version::patch_");
 }
 
 
-bool Common::CheckVersion(int64_t major, int64_t minor) {
+bool Common::CheckHighestVersion(int64_t major, int64_t minor, int64_t patch) {
   Load();
 
-  if (major > kVersionMajor) return false;
-  if (minor > kVersionMinor) return false;
+  if (kVersionMajor < major) return true;
+  if (kVersionMajor > major) return false;
 
+  if (kVersionMinor < minor) return true;
+  if (kVersionMinor > minor) return false;
+
+  if (kVersionPatch > patch) return false;
+  return true;
+}
+
+
+bool Common::CheckLowestVersion(int64_t major, int64_t minor, int64_t patch) {
+  Load();
+
+  if (kVersionMajor > major) return true;
+  if (kVersionMajor < major) return false;
+
+  if (kVersionMinor > minor) return true;
+  if (kVersionMinor < minor) return false;
+
+  if (kVersionPatch < patch) return false;
   return true;
 }
 
@@ -152,7 +183,16 @@ void HeapObject::Load() {
 
 
 void Map::Load() {
-  kInstanceAttrsOffset = LoadConstant("class_Map__instance_attributes__int");
+  Error err;
+  kInstanceAttrsOffset =
+      LoadConstant("class_Map__instance_attributes__int", err);
+  if (err.Fail()) {
+    kInstanceAttrsOffset = LoadConstant("class_Map__instance_type__uint16_t");
+    kMapTypeMask = 0xffff;
+  } else {
+    kMapTypeMask = 0xff;
+  }
+
   kMaybeConstructorOffset =
       LoadConstant("class_Map__constructor_or_backpointer__Object",
                    "class_Map__constructor__Object");
@@ -186,9 +226,23 @@ void Map::Load() {
 
 
 void JSObject::Load() {
-  kPropertiesOffset = LoadConstant("class_JSReceiver__properties__FixedArray",
-                                   "class_JSObject__properties__FixedArray");
+  kPropertiesOffset =
+      LoadConstant("class_JSReceiver__raw_properties_or_hash__Object",
+                   "class_JSReceiver__properties__FixedArray");
+
+  if (kPropertiesOffset == -1)
+    kPropertiesOffset = LoadConstant("class_JSObject__properties__FixedArray");
+
   kElementsOffset = LoadConstant("class_JSObject__elements__Object");
+  kInternalFieldsOffset =
+      LoadConstant("class_JSObject__internal_fields__uintptr_t");
+
+  if (kInternalFieldsOffset == -1) {
+    common_->Load();
+
+    // TODO(indutny): check V8 version?
+    kInternalFieldsOffset = kElementsOffset + common_->kPointerSize;
+  }
 }
 
 
@@ -227,16 +281,27 @@ void JSDate::Load() {
 
 
 void SharedInfo::Load() {
-  kNameOffset = LoadConstant("class_SharedFunctionInfo__name__Object");
+  kNameOffset = LoadConstant("class_SharedFunctionInfo__raw_name__Object",
+                             "class_SharedFunctionInfo__name__Object");
   kInferredNameOffset =
-      LoadConstant("class_SharedFunctionInfo__inferred_name__String");
+      LoadConstant("class_SharedFunctionInfo__inferred_name__String",
+                   "class_SharedFunctionInfo__function_identifier__Object");
   kScriptOffset = LoadConstant("class_SharedFunctionInfo__script__Object");
   kCodeOffset = LoadConstant("class_SharedFunctionInfo__code__Code");
   kStartPositionOffset =
-      LoadConstant("class_SharedFunctionInfo__start_position_and_type__SMI");
+      LoadConstant("class_SharedFunctionInfo__start_position_and_type__int",
+                   "class_SharedFunctionInfo__start_position_and_type__SMI");
+  kEndPositionOffset =
+      LoadConstant("class_SharedFunctionInfo__end_position__int",
+                   "class_SharedFunctionInfo__end_position__SMI");
   kParameterCountOffset = LoadConstant(
-      "class_SharedFunctionInfo__internal_formal_parameter_count__SMI",
-      "class_SharedFunctionInfo__formal_parameter_count__SMI");
+      "class_SharedFunctionInfo__internal_formal_parameter_count__int",
+      "class_SharedFunctionInfo__internal_formal_parameter_count__SMI");
+
+  if (kParameterCountOffset == -1) {
+    kParameterCountOffset =
+        LoadConstant("class_SharedFunctionInfo__formal_parameter_count__SMI");
+  }
 
   // NOTE: Could potentially be -1 on v4 and v5 node, should check in llv8
   kScopeInfoOffset =
@@ -250,6 +315,11 @@ void SharedInfo::Load() {
     kStartPositionShift = 2;
     kStartPositionMask = ~((1 << kStartPositionShift) - 1);
   }
+
+  if (LoadConstant("class_SharedFunctionInfo__compiler_hints__int") == -1)
+    kEndPositionShift = 1;
+  else
+    kEndPositionShift = 0;
 }
 
 
@@ -263,7 +333,6 @@ void ScopeInfo::Load() {
   kParameterCountOffset = LoadConstant("scopeinfo_idx_nparams");
   kStackLocalCountOffset = LoadConstant("scopeinfo_idx_nstacklocals");
   kContextLocalCountOffset = LoadConstant("scopeinfo_idx_ncontextlocals");
-  kContextGlobalCountOffset = LoadConstant("scopeinfo_idx_ncontextglobals");
   kVariablePartIndex = LoadConstant("scopeinfo_idx_first_vars");
 }
 
@@ -296,6 +365,7 @@ void String::Load() {
   kConsStringTag = LoadConstant("ConsStringTag");
   kSlicedStringTag = LoadConstant("SlicedStringTag");
   kExternalStringTag = LoadConstant("ExternalStringTag");
+  kThinStringTag = LoadConstant("ThinStringTag");
 
   kLengthOffset = LoadConstant("class_String__length__SMI");
 }
@@ -324,6 +394,9 @@ void SlicedString::Load() {
   kOffsetOffset = LoadConstant("class_SlicedString__offset__SMI");
 }
 
+void ThinString::Load() {
+  kActualOffset = LoadConstant("class_ThinString__actual__String");
+}
 
 void FixedArrayBase::Load() {
   kLengthOffset = LoadConstant("class_FixedArrayBase__length__SMI");
@@ -332,6 +405,14 @@ void FixedArrayBase::Load() {
 
 void FixedArray::Load() {
   kDataOffset = LoadConstant("class_FixedArray__data__uintptr_t");
+}
+
+
+void FixedTypedArrayBase::Load() {
+  kBasePointerOffset =
+      LoadConstant("class_FixedTypedArrayBase__base_pointer__Object");
+  kExternalPointerOffset =
+      LoadConstant("class_FixedTypedArrayBase__external_pointer__Object");
 }
 
 
@@ -358,9 +439,10 @@ void JSArrayBuffer::Load() {
     common_->Load();
 
     kBackingStoreOffset = kByteLengthOffset + common_->kPointerSize;
-    kBitFieldOffset = kBackingStoreOffset + common_->kPointerSize;
-    if (common_->kPointerSize == 8) kBitFieldOffset += 4;
   }
+
+  kBitFieldOffset = kBackingStoreOffset + common_->kPointerSize;
+  if (common_->kPointerSize == 8) kBitFieldOffset += 4;
 
   kWasNeuteredMask = LoadConstant("jsarray_buffer_was_neutered_mask");
   kWasNeuteredShift = LoadConstant("jsarray_buffer_was_neutered_shift");
@@ -391,6 +473,35 @@ void DescriptorArray::Load() {
   kPropertyIndexShift = LoadConstant("prop_index_shift");
   kPropertyTypeMask = LoadConstant("prop_type_mask");
 
+  if (kPropertyTypeMask == -1) {  // node.js >= 8
+    kPropertyAttributesMask = LoadConstant("prop_attributes_mask");
+    kPropertyAttributesShift = LoadConstant("prop_attributes_shift");
+    kPropertyAttributesEnum_NONE = LoadConstant("prop_attributes_NONE");
+    kPropertyAttributesEnum_READ_ONLY =
+        LoadConstant("prop_attributes_READ_ONLY");
+    kPropertyAttributesEnum_DONT_ENUM =
+        LoadConstant("prop_attributes_DONT_ENUM");
+    kPropertyAttributesEnum_DONT_DELETE =
+        LoadConstant("prop_attributes_DONT_ENUM");
+
+    kPropertyKindMask = LoadConstant("prop_kind_mask");
+    kPropertyKindEnum_kAccessor = LoadConstant("prop_kind_Accessor");
+    kPropertyKindEnum_kData = LoadConstant("prop_kind_Data");
+
+    kPropertyLocationMask = LoadConstant("prop_location_mask");
+    kPropertyLocationShift = LoadConstant("prop_location_shift");
+    kPropertyLocationEnum_kDescriptor =
+        LoadConstant("prop_location_Descriptor");
+    kPropertyLocationEnum_kField = LoadConstant("prop_location_Field");
+  } else {  // node.js <= 7
+    kFieldType = LoadConstant("prop_type_field");
+    kConstFieldType = LoadConstant("prop_type_const_field");
+    if (kConstFieldType == -1) {
+      // TODO(indutny): check V8 version?
+      kConstFieldType = kFieldType | 0x2;
+    }
+  }
+
   kRepresentationShift = LoadConstant("prop_representation_shift");
   kRepresentationMask = LoadConstant("prop_representation_mask");
 
@@ -398,13 +509,6 @@ void DescriptorArray::Load() {
     // TODO(indutny): check V8 version?
     kRepresentationShift = 5;
     kRepresentationMask = ((1 << 4) - 1) << kRepresentationShift;
-  }
-
-  kFieldType = LoadConstant("prop_type_field");
-  kConstFieldType = LoadConstant("prop_type_const_field");
-  if (kConstFieldType == -1) {
-    // TODO(indutny): check V8 version?
-    kConstFieldType = kFieldType | 0x2;
   }
 
   kRepresentationDouble = LoadConstant("prop_representation_double");
@@ -450,12 +554,15 @@ void Frame::Load() {
 
   kAdaptorFrame = LoadConstant("frametype_ArgumentsAdaptorFrame");
   kEntryFrame = LoadConstant("frametype_EntryFrame");
-  kEntryConstructFrame = LoadConstant("frametype_EntryConstructFrame");
+  kEntryConstructFrame = LoadConstant("frametype_ConstructEntryFrame",
+                                      "frametype_EntryConstructFrame");
   kExitFrame = LoadConstant("frametype_ExitFrame");
   kInternalFrame = LoadConstant("frametype_InternalFrame");
   kConstructFrame = LoadConstant("frametype_ConstructFrame");
+  // NOTE: The JavaScript frame type was removed in V8 6.3.158.
   kJSFrame = LoadConstant("frametype_JavaScriptFrame");
   kOptimizedFrame = LoadConstant("frametype_OptimizedFrame");
+  kStubFrame = LoadConstant("frametype_StubFrame");
 }
 
 
@@ -466,8 +573,12 @@ void Types::Load() {
   kMapType = LoadConstant("type_Map__MAP_TYPE");
   kGlobalObjectType =
       LoadConstant("type_JSGlobalObject__JS_GLOBAL_OBJECT_TYPE");
+  kGlobalProxyType = LoadConstant("type_JSGlobalProxy__JS_GLOBAL_PROXY_TYPE");
   kOddballType = LoadConstant("type_Oddball__ODDBALL_TYPE");
   kJSObjectType = LoadConstant("type_JSObject__JS_OBJECT_TYPE");
+  kJSAPIObjectType = LoadConstant("APIObjectType");
+  kJSSpecialAPIObjectType =
+      LoadConstant("SpecialAPIObjectType", "APISpecialObjectType");
   kJSArrayType = LoadConstant("type_JSArray__JS_ARRAY_TYPE");
   kCodeType = LoadConstant("type_Code__CODE_TYPE");
   kJSFunctionType = LoadConstant("type_JSFunction__JS_FUNCTION_TYPE");
@@ -478,6 +589,14 @@ void Types::Load() {
   kJSDateType = LoadConstant("type_JSDate__JS_DATE_TYPE");
   kSharedFunctionInfoType =
       LoadConstant("type_SharedFunctionInfo__SHARED_FUNCTION_INFO_TYPE");
+  kScriptType = LoadConstant("type_Script__SCRIPT_TYPE");
+
+  if (kJSAPIObjectType == -1) {
+    common_->Load();
+
+    if (common_->CheckLowestVersion(5, 2, 12))
+      kJSAPIObjectType = kJSObjectType - 1;
+  }
 }
 
 }  // namespace constants

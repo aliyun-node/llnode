@@ -1,6 +1,7 @@
 #ifndef SRC_LLV8_H_
 #define SRC_LLV8_H_
 
+#include <cstring>
 #include <string>
 
 #include <lldb/API/LLDB.h>
@@ -10,6 +11,8 @@
 namespace llnode {
 
 class FindJSObjectsVisitor;
+class FindReferencesCmd;
+class FindObjectsCmd;
 
 namespace v8 {
 
@@ -19,20 +22,30 @@ class CodeMap;
 
 class Error {
  public:
-  Error() : failed_(false), msg_(nullptr) {}
-  Error(bool failed, const char* msg) : failed_(failed), msg_(msg) {}
+  Error() : failed_(false), msg_("") {}
+  Error(bool failed, std::string msg) : failed_(failed), msg_(msg) {}
+  Error(bool failed, const char* format, ...)
+      __attribute__((format(printf, 3, 4)));
 
   static inline Error Ok() { return Error(false, "ok"); }
-  static inline Error Failure(const char* msg) { return Error(true, msg); }
+  static Error Failure(std::string msg);
+  static Error Failure(const char* format, ...)
+      __attribute__((format(printf, 1, 2)));
+  static void PrintInDebugMode(const char* format, ...)
+      __attribute__((format(printf, 1, 2)));
 
   inline bool Success() const { return !Fail(); }
   inline bool Fail() const { return failed_; }
 
-  inline const char* GetMessage() { return msg_; }
+  inline const char* GetMessage() { return msg_.c_str(); }
+
+  static void SetDebugMode(bool mode) { is_debug_mode = mode; }
 
  private:
   bool failed_;
-  const char* msg_;
+  std::string msg_;
+  static const size_t kMaxMessageLength = 128;
+  static bool is_debug_mode;
 };
 
 #define V8_VALUE_DEFAULT_METHODS(NAME, PARENT)     \
@@ -40,20 +53,25 @@ class Error {
   NAME() : PARENT() {}                             \
   NAME(LLV8* v8, int64_t raw) : PARENT(v8, raw) {} \
   NAME(Value& v) : PARENT(v) {}                    \
-  NAME(Value* v) : PARENT(v->v8(), v->raw()) {}
+  NAME(Value* v) : PARENT(v->v8(), v->raw()) {}    \
+  static inline const char* ClassName() { return #NAME; }
 
 class Value {
  public:
   class InspectOptions {
    public:
     InspectOptions()
-        : detailed(false), print_map(false), string_length(kStringLength) {}
+        : detailed(false),
+          print_map(false),
+          print_source(false),
+          length(kLength) {}
 
-    static const unsigned int kStringLength = 16;
+    static const unsigned int kLength = 16;
 
     bool detailed;
     bool print_map;
-    unsigned int string_length;
+    bool print_source;
+    unsigned int length;
   };
 
   Value(const Value& v) = default;
@@ -70,8 +88,10 @@ class Value {
   bool IsHole(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
-  std::string GetTypeName(InspectOptions* options, Error& err);
+  std::string GetTypeName(Error& err);
   std::string ToString(Error& err);
+
+  static inline const char* ClassName() { return "Value"; }
 
  protected:
   LLV8* v8_;
@@ -105,7 +125,7 @@ class HeapObject : public Value {
 
   std::string ToString(Error& err);
   std::string Inspect(InspectOptions* options, Error& err);
-  std::string GetTypeName(InspectOptions* options, Error& err);
+  std::string GetTypeName(Error& err);
 };
 
 class Map : public HeapObject {
@@ -166,12 +186,13 @@ class SharedFunctionInfo : public HeapObject {
   V8_VALUE_DEFAULT_METHODS(SharedFunctionInfo, HeapObject)
 
   inline String Name(Error& err);
-  inline String InferredName(Error& err);
+  inline Value InferredName(Error& err);
   inline Script GetScript(Error& err);
   inline Code GetCode(Error& err);
   inline HeapObject GetScopeInfo(Error& err);
   inline int64_t ParameterCount(Error& err);
   inline int64_t StartPosition(Error& err);
+  inline int64_t EndPosition(Error& err);
 
   std::string ProperName(Error& err);
   std::string GetPostfix(Error& err);
@@ -212,6 +233,15 @@ class SlicedString : public String {
   inline std::string ToString(Error& err);
 };
 
+class ThinString : public String {
+ public:
+  V8_VALUE_DEFAULT_METHODS(ThinString, String)
+
+  inline String Actual(Error& err);
+
+  inline std::string ToString(Error& err);
+};
+
 class HeapNumber : public HeapObject {
  public:
   V8_VALUE_DEFAULT_METHODS(HeapNumber, HeapObject)
@@ -230,15 +260,37 @@ class JSObject : public HeapObject {
   inline HeapObject Elements(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
+  std::string InspectInternalFields(Error& err);
   std::string InspectProperties(Error& err);
+
+  std::string InspectElements(Error& err);
+  std::string InspectElements(int64_t length, Error& err);
+  std::string InspectDictionary(Error& err);
+  std::string InspectDescriptors(Map map, Error& err);
+  void Keys(std::vector<std::string>& keys, Error& err);
+
+  /** Return all the key/value pairs for properties on a JSObject
+   * This allows keys to be inflated to JSStrings later once we know if
+   * they are needed.
+   */
+  std::vector<std::pair<Value, Value>> Entries(Error& err);
+
+  Value GetProperty(std::string key_name, Error& err);
+  int64_t GetArrayLength(Error& err);
+  Value GetArrayElement(int64_t pos, Error& err);
+
+  static inline bool IsObjectType(LLV8* v8, int64_t type);
 
  protected:
   template <class T>
   T GetInObjectValue(int64_t size, int index, Error& err);
-
-  std::string InspectElements(Error& err);
-  std::string InspectDictionary(Error& err);
-  std::string InspectDescriptors(Map map, Error& err);
+  void ElementKeys(std::vector<std::string>& keys, Error& err);
+  void DictionaryKeys(std::vector<std::string>& keys, Error& err);
+  void DescriptorKeys(std::vector<std::string>& keys, Map map, Error& err);
+  std::vector<std::pair<Value, Value>> DictionaryEntries(Error& err);
+  std::vector<std::pair<Value, Value>> DescriptorEntries(Map map, Error& err);
+  Value GetDictionaryProperty(std::string key_name, Error& err);
+  Value GetDescriptorProperty(std::string key_name, Map map, Error& err);
 };
 
 class JSArray : public JSObject {
@@ -260,6 +312,7 @@ class JSFunction : public JSObject {
 
   std::string GetDebugLine(std::string args, Error& err);
   std::string Inspect(InspectOptions* options, Error& err);
+  std::string GetSource(Error& err);
 };
 
 class JSRegExp : public JSObject {
@@ -300,6 +353,14 @@ class FixedArray : public FixedArrayBase {
 
  private:
   std::string InspectContents(int length, Error& err);
+};
+
+class FixedTypedArrayBase : public FixedArrayBase {
+ public:
+  V8_VALUE_DEFAULT_METHODS(FixedTypedArrayBase, FixedArrayBase)
+
+  inline int64_t GetBase(Error& err);
+  inline int64_t GetExternal(Error& err);
 };
 
 class DescriptorArray : public FixedArray {
@@ -345,7 +406,6 @@ class ScopeInfo : public FixedArray {
   inline Smi ParameterCount(Error& err);
   inline Smi StackLocalCount(Error& err);
   inline Smi ContextLocalCount(Error& err);
-  inline Smi ContextGlobalCount(Error& err);
 
   inline String ContextLocalName(int index, int param_count, int stack_count,
                                  Error& err);
@@ -362,9 +422,9 @@ class Oddball : public HeapObject {
   std::string Inspect(Error& err);
 };
 
-class JSArrayBuffer : public HeapObject {
+class JSArrayBuffer : public JSObject {
  public:
-  V8_VALUE_DEFAULT_METHODS(JSArrayBuffer, HeapObject)
+  V8_VALUE_DEFAULT_METHODS(JSArrayBuffer, JSObject)
 
   inline int64_t BackingStore(Error& err);
   inline int64_t BitField(Error& err);
@@ -372,18 +432,18 @@ class JSArrayBuffer : public HeapObject {
 
   inline bool WasNeutered(Error& err);
 
-  std::string Inspect(Error& err);
+  std::string Inspect(InspectOptions* options, Error& err);
 };
 
-class JSArrayBufferView : public HeapObject {
+class JSArrayBufferView : public JSObject {
  public:
-  V8_VALUE_DEFAULT_METHODS(JSArrayBufferView, HeapObject)
+  V8_VALUE_DEFAULT_METHODS(JSArrayBufferView, JSObject)
 
   inline JSArrayBuffer Buffer(Error& err);
   inline Smi ByteOffset(Error& err);
   inline Smi ByteLength(Error& err);
 
-  std::string Inspect(Error& err);
+  std::string Inspect(InspectOptions* options, Error& err);
 };
 
 class JSFrame : public Value {
@@ -400,6 +460,9 @@ class JSFrame : public Value {
                                uint32_t& lines_found, Error& err);
   std::string Inspect(bool with_args, Error& err);
   std::string InspectArgs(JSFunction fn, Error& err);
+
+ private:
+  Smi FromFrameMarker(Value value) const;
 };
 
 class LLV8 {
@@ -414,7 +477,9 @@ class LLV8 {
 
   int64_t LoadConstant(const char* name);
   int64_t LoadPtr(int64_t addr, Error& err);
+  int64_t LoadUnsigned(int64_t addr, uint32_t byte_size, Error& err);
   double LoadDouble(int64_t addr, Error& err);
+  std::string LoadBytes(int64_t addr, int64_t length, Error& err);
   std::string LoadString(int64_t addr, int64_t length, Error& err);
   std::string LoadTwoByteString(int64_t addr, int64_t length, Error& err);
   uint8_t* LoadChunk(int64_t addr, int64_t length, Error& err);
@@ -440,7 +505,9 @@ class LLV8 {
   constants::TwoByteString two_byte_string;
   constants::ConsString cons_string;
   constants::SlicedString sliced_string;
+  constants::ThinString thin_string;
   constants::FixedArrayBase fixed_array_base;
+  constants::FixedTypedArrayBase fixed_typed_array_base;
   constants::FixedArray fixed_array;
   constants::Oddball oddball;
   constants::JSArrayBuffer js_array_buffer;
@@ -466,11 +533,13 @@ class LLV8 {
   friend class TwoByteString;
   friend class ConsString;
   friend class SlicedString;
+  friend class ThinString;
   friend class HeapNumber;
   friend class JSObject;
   friend class JSArray;
   friend class FixedArrayBase;
   friend class FixedArray;
+  friend class FixedTypedArrayBase;
   friend class DescriptorArray;
   friend class NameDictionary;
   friend class Context;
@@ -482,6 +551,8 @@ class LLV8 {
   friend class JSDate;
   friend class CodeMap;
   friend class llnode::FindJSObjectsVisitor;
+  friend class llnode::FindObjectsCmd;
+  friend class llnode::FindReferencesCmd;
 };
 
 #undef V8_VALUE_DEFAULT_METHODS

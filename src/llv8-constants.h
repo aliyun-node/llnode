@@ -5,10 +5,14 @@
 
 namespace llnode {
 namespace v8 {
+
+class Error;
+
 namespace constants {
 
 // Forward declarations
 class Common;
+
 
 class Module {
  public:
@@ -20,6 +24,7 @@ class Module {
 
  protected:
   int64_t LoadRawConstant(const char* name, int64_t def = -1);
+  int64_t LoadConstant(const char* name, Error& err, int64_t def = -1);
   int64_t LoadConstant(const char* name, int64_t def = -1);
   int64_t LoadConstant(const char* name, const char* fallback,
                        int64_t def = -1);
@@ -45,8 +50,10 @@ class Common : public Module {
   int64_t kPointerSize;
   int64_t kVersionMajor;
   int64_t kVersionMinor;
+  int64_t kVersionPatch;
 
-  bool CheckVersion(int64_t major, int64_t minor);
+  bool CheckLowestVersion(int64_t major, int64_t minor, int64_t patch);
+  bool CheckHighestVersion(int64_t major, int64_t minor, int64_t patch);
 
   // Public, because other modules may use it
   void Load();
@@ -81,6 +88,7 @@ class Map : public Module {
  public:
   MODULE_DEFAULT_METHODS(Map);
 
+  int64_t kMapTypeMask;
   int64_t kInstanceAttrsOffset;
   int64_t kMaybeConstructorOffset;
   int64_t kInstanceDescriptorsOffset;
@@ -102,6 +110,7 @@ class JSObject : public Module {
 
   int64_t kPropertiesOffset;
   int64_t kElementsOffset;
+  int64_t kInternalFieldsOffset;
 
  protected:
   void Load();
@@ -167,11 +176,13 @@ class SharedInfo : public Module {
   int64_t kScriptOffset;
   int64_t kCodeOffset;
   int64_t kStartPositionOffset;
+  int64_t kEndPositionOffset;
   int64_t kParameterCountOffset;
   int64_t kScopeInfoOffset;
 
   int64_t kStartPositionMask;
   int64_t kStartPositionShift;
+  int64_t kEndPositionShift;
 
  protected:
   void Load();
@@ -195,7 +206,6 @@ class ScopeInfo : public Module {
   int64_t kParameterCountOffset;
   int64_t kStackLocalCountOffset;
   int64_t kContextLocalCountOffset;
-  int64_t kContextGlobalCountOffset;
   int64_t kVariablePartIndex;
 
  protected:
@@ -244,6 +254,7 @@ class String : public Module {
   int64_t kConsStringTag;
   int64_t kSlicedStringTag;
   int64_t kExternalStringTag;
+  int64_t kThinStringTag;
 
   int64_t kLengthOffset;
 
@@ -293,6 +304,16 @@ class SlicedString : public Module {
   void Load();
 };
 
+class ThinString : public Module {
+ public:
+  MODULE_DEFAULT_METHODS(ThinString);
+
+  int64_t kActualOffset;
+
+ protected:
+  void Load();
+};
+
 class FixedArrayBase : public Module {
  public:
   MODULE_DEFAULT_METHODS(FixedArrayBase);
@@ -308,6 +329,17 @@ class FixedArray : public Module {
   MODULE_DEFAULT_METHODS(FixedArray);
 
   int64_t kDataOffset;
+
+ protected:
+  void Load();
+};
+
+class FixedTypedArrayBase : public Module {
+ public:
+  MODULE_DEFAULT_METHODS(FixedTypedArrayBase);
+
+  int64_t kBasePointerOffset;
+  int64_t kExternalPointerOffset;
 
  protected:
   void Load();
@@ -370,16 +402,35 @@ class DescriptorArray : public Module {
 
   int64_t kPropertyIndexMask;
   int64_t kPropertyIndexShift;
-  int64_t kPropertyTypeMask;
   int64_t kRepresentationMask;
   int64_t kRepresentationShift;
 
-  int64_t kFieldType;
-  int64_t kConstFieldType;
   int64_t kRepresentationDouble;
 
   int64_t kFirstIndex;
   int64_t kSize;
+
+  // node.js <= 7
+  int64_t kPropertyTypeMask = -1;
+  int64_t kConstFieldType = -1;
+  int64_t kFieldType = -1;
+
+  // node.js >= 8
+  int64_t kPropertyAttributesMask = -1;
+  int64_t kPropertyAttributesShift = -1;
+  int64_t kPropertyAttributesEnum_NONE = -1;
+  int64_t kPropertyAttributesEnum_READ_ONLY = -1;
+  int64_t kPropertyAttributesEnum_DONT_ENUM = -1;
+  int64_t kPropertyAttributesEnum_DONT_DELETE = -1;
+
+  int64_t kPropertyKindMask = -1;
+  int64_t kPropertyKindEnum_kAccessor = -1;
+  int64_t kPropertyKindEnum_kData = -1;
+
+  int64_t kPropertyLocationMask = -1;
+  int64_t kPropertyLocationShift = -1;
+  int64_t kPropertyLocationEnum_kDescriptor = -1;
+  int64_t kPropertyLocationEnum_kField = -1;
 
  protected:
   void Load();
@@ -417,6 +468,7 @@ class Frame : public Module {
   int64_t kConstructFrame;
   int64_t kJSFrame;
   int64_t kOptimizedFrame;
+  int64_t kStubFrame;
 
  protected:
   void Load();
@@ -431,8 +483,11 @@ class Types : public Module {
   int64_t kHeapNumberType;
   int64_t kMapType;
   int64_t kGlobalObjectType;
+  int64_t kGlobalProxyType;
   int64_t kOddballType;
   int64_t kJSObjectType;
+  int64_t kJSAPIObjectType;
+  int64_t kJSSpecialAPIObjectType;
   int64_t kJSArrayType;
   int64_t kCodeType;
   int64_t kJSFunctionType;
@@ -442,6 +497,7 @@ class Types : public Module {
   int64_t kJSRegExpType;
   int64_t kJSDateType;
   int64_t kSharedFunctionInfoType;
+  int64_t kScriptType;
 
  protected:
   void Load();

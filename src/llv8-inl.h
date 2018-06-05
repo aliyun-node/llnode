@@ -1,6 +1,7 @@
 #ifndef SRC_LLV8_INL_H_
 #define SRC_LLV8_INL_H_
 
+#include <cinttypes>
 #include "llv8.h"
 
 namespace llnode {
@@ -19,7 +20,9 @@ inline T LLV8::LoadValue(int64_t addr, Error& err) {
 
   T res = T(this, ptr);
   if (!res.Check()) {
-    err = Error::Failure("Invalid value");
+    // TODO(joyeecheung): use Error::Failure() to report information when
+    // there is less noise from here.
+    err = Error(true, "Invalid value");
     return T();
   }
 
@@ -63,7 +66,8 @@ inline T HeapObject::LoadFieldValue(int64_t off, Error& err) {
   T res = v8()->LoadValue<T>(LeaField(off), err);
   if (err.Fail()) return T();
   if (!res.Check()) {
-    err = Error::Failure("Invalid value");
+    err = Error::Failure("Invalid field value %s at 0x%016" PRIx64,
+                         T::ClassName(), off);
     return T();
   }
 
@@ -81,9 +85,11 @@ inline int64_t HeapObject::GetType(Error& err) {
 
 
 inline int64_t Map::GetType(Error& err) {
-  int64_t type = LoadField(v8()->map()->kInstanceAttrsOffset, err);
+  int64_t type =
+      v8()->LoadUnsigned(LeaField(v8()->map()->kInstanceAttrsOffset), 2, err);
   if (err.Fail()) return -1;
-  return type & 0xff;
+
+  return type & v8()->map()->kMapTypeMask;
 }
 
 
@@ -150,7 +156,7 @@ ACCESSOR(Map, InstanceDescriptors, map()->kInstanceDescriptorsOffset,
          HeapObject)
 
 inline int64_t Map::BitField3(Error& err) {
-  return LoadField(v8()->map()->kBitField3Offset, err) & 0xffffffff;
+  return v8()->LoadUnsigned(LeaField(v8()->map()->kBitField3Offset), 4, err);
 }
 
 inline int64_t Map::InObjectProperties(Error& err) {
@@ -158,12 +164,19 @@ inline int64_t Map::InObjectProperties(Error& err) {
 }
 
 inline int64_t Map::InstanceSize(Error& err) {
-  return (LoadField(v8()->map()->kInstanceSizeOffset, err) & 0xff) *
+  return v8()->LoadUnsigned(LeaField(v8()->map()->kInstanceSizeOffset), 1,
+                            err) *
          v8()->common()->kPointerSize;
 }
 
 ACCESSOR(JSObject, Properties, js_object()->kPropertiesOffset, HeapObject)
 ACCESSOR(JSObject, Elements, js_object()->kElementsOffset, HeapObject)
+
+inline bool JSObject::IsObjectType(LLV8* v8, int64_t type) {
+  return type == v8->types()->kJSObjectType ||
+         type == v8->types()->kJSAPIObjectType ||
+         type == v8->types()->kJSSpecialAPIObjectType;
+}
 
 ACCESSOR(HeapNumber, GetValue, heap_number()->kValueOffset, double)
 
@@ -195,7 +208,7 @@ ACCESSOR(Script, LineEnds, script()->kLineEndsOffset, HeapObject)
 
 ACCESSOR(SharedFunctionInfo, Name, shared_info()->kNameOffset, String)
 ACCESSOR(SharedFunctionInfo, InferredName, shared_info()->kInferredNameOffset,
-         String)
+         Value)
 ACCESSOR(SharedFunctionInfo, GetScript, shared_info()->kScriptOffset, Script)
 ACCESSOR(SharedFunctionInfo, GetCode, shared_info()->kCodeOffset, Code)
 ACCESSOR(SharedFunctionInfo, GetScopeInfo, shared_info()->kScopeInfoOffset,
@@ -247,6 +260,16 @@ inline int64_t SharedFunctionInfo::StartPosition(Error& err) {
   return field;
 }
 
+// TODO (hhellyer): as above, this field is different on 32bit.
+inline int64_t SharedFunctionInfo::EndPosition(Error& err) {
+  int64_t field = LoadField(v8()->shared_info()->kEndPositionOffset, err);
+  if (err.Fail()) return -1;
+
+  field &= 0xffffffff;
+  field >>= v8()->shared_info()->kEndPositionShift;
+  return field;
+}
+
 ACCESSOR(JSFunction, Info, js_function()->kSharedInfoOffset,
          SharedFunctionInfo);
 ACCESSOR(JSFunction, GetContext, js_function()->kContextOffset, HeapObject);
@@ -257,7 +280,17 @@ ACCESSOR(ConsString, Second, cons_string()->kSecondOffset, String);
 ACCESSOR(SlicedString, Parent, sliced_string()->kParentOffset, String);
 ACCESSOR(SlicedString, Offset, sliced_string()->kOffsetOffset, Smi);
 
+ACCESSOR(ThinString, Actual, thin_string()->kActualOffset, String);
+
 ACCESSOR(FixedArrayBase, Length, fixed_array_base()->kLengthOffset, Smi);
+
+inline int64_t FixedTypedArrayBase::GetBase(Error& err) {
+  return LoadField(v8()->fixed_typed_array_base()->kBasePointerOffset, err);
+}
+
+inline int64_t FixedTypedArrayBase::GetExternal(Error& err) {
+  return LoadField(v8()->fixed_typed_array_base()->kExternalPointerOffset, err);
+}
 
 inline std::string OneByteString::ToString(Error& err) {
   int64_t chars = LeaField(v8()->one_byte_string()->kCharsOffset);
@@ -292,6 +325,13 @@ inline std::string SlicedString::ToString(Error& err) {
   String parent = Parent(err);
   if (err.Fail()) return std::string();
 
+  // TODO - Remove when we add support for external strings
+  // We can't use the offset and length safely if we get "(external)"
+  // instead of the original parent string.
+  if (parent.Representation(err) == v8()->string()->kExternalStringTag) {
+    return parent.ToString(err);
+  }
+
   Smi offset = Offset(err);
   if (err.Fail()) return std::string();
 
@@ -302,6 +342,16 @@ inline std::string SlicedString::ToString(Error& err) {
   if (err.Fail()) return std::string();
 
   return tmp.substr(offset.GetValue(), length.GetValue());
+}
+
+inline std::string ThinString::ToString(Error& err) {
+  String actual = Actual(err);
+  if (err.Fail()) return std::string();
+
+  std::string tmp = actual.ToString(err);
+  if (err.Fail()) return std::string();
+
+  return tmp;
 }
 
 inline int64_t FixedArray::LeaData() const {
@@ -337,13 +387,31 @@ inline Value DescriptorArray::GetValue(int index, Error& err) {
 }
 
 inline bool DescriptorArray::IsFieldDetails(Smi details) {
-  return (details.GetValue() & v8()->descriptor_array()->kPropertyTypeMask) ==
-         v8()->descriptor_array()->kFieldType;
+  // node.js <= 7
+  if (v8()->descriptor_array()->kPropertyTypeMask != -1) {
+    return (details.GetValue() & v8()->descriptor_array()->kPropertyTypeMask) ==
+           v8()->descriptor_array()->kFieldType;
+  }
+
+  // node.js >= 8
+  return (details.GetValue() &
+          v8()->descriptor_array()->kPropertyLocationMask) ==
+         (v8()->descriptor_array()->kPropertyLocationEnum_kField
+          << v8()->descriptor_array()->kPropertyLocationShift);
 }
 
 inline bool DescriptorArray::IsConstFieldDetails(Smi details) {
-  return (details.GetValue() & v8()->descriptor_array()->kPropertyTypeMask) ==
-         v8()->descriptor_array()->kConstFieldType;
+  // node.js <= 7
+  if (v8()->descriptor_array()->kPropertyTypeMask != -1) {
+    return (details.GetValue() & v8()->descriptor_array()->kPropertyTypeMask) ==
+           v8()->descriptor_array()->kConstFieldType;
+  }
+
+  // node.js >= 8
+  return (details.GetValue() &
+          v8()->descriptor_array()->kPropertyAttributesMask) ==
+         (v8()->descriptor_array()->kPropertyAttributesEnum_READ_ONLY
+          << v8()->descriptor_array()->kPropertyAttributesShift);
 }
 
 inline bool DescriptorArray::IsDoubleField(Smi details) {
@@ -404,11 +472,6 @@ inline Smi ScopeInfo::StackLocalCount(Error& err) {
 
 inline Smi ScopeInfo::ContextLocalCount(Error& err) {
   return FixedArray::Get<Smi>(v8()->scope_info()->kContextLocalCountOffset,
-                              err);
-}
-
-inline Smi ScopeInfo::ContextGlobalCount(Error& err) {
-  return FixedArray::Get<Smi>(v8()->scope_info()->kContextGlobalCountOffset,
                               err);
 }
 

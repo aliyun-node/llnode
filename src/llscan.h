@@ -4,39 +4,183 @@
 #include <lldb/API/LLDB.h>
 #include <map>
 #include <set>
+#include "src/llnode.h"
 
 namespace llnode {
 
+class LLScan;
+
+typedef std::vector<uint64_t> ReferencesVector;
+
+typedef std::map<uint64_t, ReferencesVector*> ReferencesByValueMap;
+typedef std::map<std::string, ReferencesVector*> ReferencesByPropertyMap;
+typedef std::map<std::string, ReferencesVector*> ReferencesByStringMap;
+
+
 class FindObjectsCmd : public CommandBase {
  public:
-  ~FindObjectsCmd() override{};
+  FindObjectsCmd(LLScan* llscan) : llscan_(llscan) {}
+  ~FindObjectsCmd() override {}
 
   bool DoExecute(lldb::SBDebugger d, char** cmd,
                  lldb::SBCommandReturnObject& result) override;
+
+  void SimpleOutput(lldb::SBCommandReturnObject& result);
+  void DetailedOutput(lldb::SBCommandReturnObject& result);
+
+ private:
+  LLScan* llscan_;
 };
 
 class FindInstancesCmd : public CommandBase {
  public:
-  ~FindInstancesCmd() override{};
+  FindInstancesCmd(LLScan* llscan, bool detailed)
+      : llscan_(llscan), detailed_(detailed) {}
+  ~FindInstancesCmd() override {}
 
   bool DoExecute(lldb::SBDebugger d, char** cmd,
                  lldb::SBCommandReturnObject& result) override;
 
  private:
+  LLScan* llscan_;
   bool detailed_;
+};
+
+class NodeInfoCmd : public CommandBase {
+ public:
+  NodeInfoCmd(LLScan* llscan) : llscan_(llscan) {}
+  ~NodeInfoCmd() override {}
+
+  bool DoExecute(lldb::SBDebugger d, char** cmd,
+                 lldb::SBCommandReturnObject& result) override;
+
+ private:
+  LLScan* llscan_;
+};
+
+class FindReferencesCmd : public CommandBase {
+ public:
+  FindReferencesCmd(LLScan* llscan) : llscan_(llscan) {}
+  ~FindReferencesCmd() override {}
+
+  bool DoExecute(lldb::SBDebugger d, char** cmd,
+                 lldb::SBCommandReturnObject& result) override;
+
+  enum ScanType { kFieldValue, kPropertyName, kStringValue, kBadOption };
+
+  char** ParseScanOptions(char** cmd, ScanType* type);
+
+  class ObjectScanner {
+   public:
+    virtual ~ObjectScanner() {}
+
+    virtual bool AreReferencesLoaded() { return false; };
+
+    virtual ReferencesVector* GetReferences() { return nullptr; };
+
+    virtual void ScanRefs(v8::JSObject& js_obj, v8::Error& err){};
+    virtual void ScanRefs(v8::String& str, v8::Error& err){};
+
+    virtual void PrintRefs(lldb::SBCommandReturnObject& result,
+                           v8::JSObject& js_obj, v8::Error& err) {}
+    virtual void PrintRefs(lldb::SBCommandReturnObject& result, v8::String& str,
+                           v8::Error& err) {}
+
+    static const char* const property_reference_template;
+    static const char* const array_reference_template;
+  };
+
+  void PrintReferences(lldb::SBCommandReturnObject& result,
+                       ReferencesVector* references, ObjectScanner* scanner);
+
+  void ScanForReferences(ObjectScanner* scanner);
+
+  class ReferenceScanner : public ObjectScanner {
+   public:
+    ReferenceScanner(LLScan* llscan, v8::Value search_value)
+        : llscan_(llscan), search_value_(search_value) {}
+
+    bool AreReferencesLoaded() override;
+
+    ReferencesVector* GetReferences() override;
+
+    void ScanRefs(v8::JSObject& js_obj, v8::Error& err) override;
+    void ScanRefs(v8::String& str, v8::Error& err) override;
+
+    void PrintRefs(lldb::SBCommandReturnObject& result, v8::JSObject& js_obj,
+                   v8::Error& err) override;
+    void PrintRefs(lldb::SBCommandReturnObject& result, v8::String& str,
+                   v8::Error& err) override;
+
+   private:
+    LLScan* llscan_;
+    v8::Value search_value_;
+  };
+
+  class PropertyScanner : public ObjectScanner {
+   public:
+    PropertyScanner(LLScan* llscan, std::string search_value)
+        : llscan_(llscan), search_value_(search_value) {}
+
+    bool AreReferencesLoaded() override;
+
+    ReferencesVector* GetReferences() override;
+
+    void ScanRefs(v8::JSObject& js_obj, v8::Error& err) override;
+
+    // We only scan properties on objects not Strings, use default no-op impl
+    // of PrintRefs for Strings.
+    void PrintRefs(lldb::SBCommandReturnObject& result, v8::JSObject& js_obj,
+                   v8::Error& err) override;
+
+   private:
+    LLScan* llscan_;
+    std::string search_value_;
+  };
+
+
+  class StringScanner : public ObjectScanner {
+   public:
+    StringScanner(LLScan* llscan, std::string search_value)
+        : llscan_(llscan), search_value_(search_value) {}
+
+    bool AreReferencesLoaded() override;
+
+    ReferencesVector* GetReferences() override;
+
+    void ScanRefs(v8::JSObject& js_obj, v8::Error& err) override;
+    void ScanRefs(v8::String& str, v8::Error& err) override;
+
+    void PrintRefs(lldb::SBCommandReturnObject& result, v8::JSObject& js_obj,
+                   v8::Error& err) override;
+    void PrintRefs(lldb::SBCommandReturnObject& result, v8::String& str,
+                   v8::Error& err) override;
+
+    static const char* const property_reference_template;
+    static const char* const array_reference_template;
+
+   private:
+    LLScan* llscan_;
+    std::string search_value_;
+  };
+
+ private:
+  LLScan* llscan_;  // FindReferencesCmd::llscan_
 };
 
 class MemoryVisitor {
  public:
-  virtual ~MemoryVisitor(){};
+  virtual ~MemoryVisitor() {}
 
   virtual uint64_t Visit(uint64_t location, uint64_t available) = 0;
 };
 
+class DetailedTypeRecord;
+
 class TypeRecord {
  public:
   TypeRecord(std::string& type_name)
-      : type_name_(type_name), instance_count_(0), total_instance_size_(0){};
+      : type_name_(type_name), instance_count_(0), total_instance_size_(0) {}
 
   inline std::string& GetTypeName() { return type_name_; };
   inline uint64_t GetInstanceCount() { return instance_count_; };
@@ -64,37 +208,88 @@ class TypeRecord {
 
 
  private:
+  friend class DetailedTypeRecord;
   std::string type_name_;
   uint64_t instance_count_;
   uint64_t total_instance_size_;
   std::set<uint64_t> instances_;
 };
 
+class DetailedTypeRecord : public TypeRecord {
+ public:
+  DetailedTypeRecord(std::string& type_name, uint64_t own_descriptors_count,
+                     uint64_t indexed_properties_count)
+      : TypeRecord(type_name),
+        own_descriptors_count_(own_descriptors_count),
+        indexed_properties_count_(indexed_properties_count) {}
+  uint64_t GetOwnDescriptorsCount() const { return own_descriptors_count_; };
+  uint64_t GetIndexedPropertiesCount() const {
+    return indexed_properties_count_;
+  };
+
+ private:
+  std::vector<std::string> properties_;
+  uint64_t own_descriptors_count_;
+  uint64_t indexed_properties_count_;
+};
+
 typedef std::map<std::string, TypeRecord*> TypeRecordMap;
+typedef std::map<std::string, DetailedTypeRecord*> DetailedTypeRecordMap;
 
 class FindJSObjectsVisitor : MemoryVisitor {
  public:
-  FindJSObjectsVisitor(lldb::SBTarget& target, TypeRecordMap& mapstoinstances);
+  FindJSObjectsVisitor(lldb::SBTarget& target, LLScan* llscan);
   ~FindJSObjectsVisitor() {}
 
-  uint64_t Visit(uint64_t location, uint64_t available);
+  uint64_t Visit(uint64_t location, uint64_t word);
 
   uint32_t FoundCount() { return found_count_; }
 
  private:
-  bool IsAHistogramType(v8::HeapObject& heap_object, v8::Error err);
+  // TODO (mmarchini): this could be an option for findjsobjects
+  static const size_t kNumberOfPropertiesForDetailedOutput = 3;
+
+  struct MapCacheEntry {
+    enum ShowArrayLength { kShowArrayLength, kDontShowArrayLength };
+
+    std::string type_name;
+    bool is_histogram;
+
+    std::vector<std::string> properties_;
+    uint64_t own_descriptors_count_ = 0;
+    uint64_t indexed_properties_count_ = 0;
+
+    std::string GetTypeNameWithProperties(
+        ShowArrayLength show_array_length = kShowArrayLength,
+        size_t max_properties = 0);
+
+    bool Load(v8::Map map, v8::HeapObject heap_object, v8::LLV8* llv8,
+              v8::Error& err);
+  };
+
+  static bool IsAHistogramType(v8::Map& map, v8::Error& err);
+
+  void InsertOnMapsToInstances(uint64_t word, v8::Map map,
+                               FindJSObjectsVisitor::MapCacheEntry map_info,
+                               v8::Error& err);
+  void InsertOnDetailedMapsToInstances(
+      uint64_t word, v8::Map map, FindJSObjectsVisitor::MapCacheEntry map_info,
+      v8::Error& err);
 
   lldb::SBTarget& target_;
   uint32_t address_byte_size_;
   uint32_t found_count_;
 
-  TypeRecordMap& mapstoinstances_;
+  LLScan* const llscan_;
+  std::map<int64_t, MapCacheEntry> map_cache_;
 };
 
 
 class LLScan {
  public:
-  LLScan(){};
+  LLScan(v8::LLV8* llv8) : llv8_(llv8) {}
+
+  v8::LLV8* v8() { return llv8_; }
 
   bool ScanHeapForObjects(lldb::SBTarget target,
                           lldb::SBCommandReturnObject& result);
@@ -102,16 +297,53 @@ class LLScan {
                             const char* segmentsfilename);
 
   inline TypeRecordMap& GetMapsToInstances() { return mapstoinstances_; };
+  inline DetailedTypeRecordMap& GetDetailedMapsToInstances() {
+    return detailedmapstoinstances_;
+  };
+
+  // References By Value
+  inline bool AreReferencesByValueLoaded() {
+    return references_by_value_.size() > 0;
+  };
+  inline ReferencesVector* GetReferencesByValue(uint64_t address) {
+    if (references_by_value_.count(address) == 0) {
+      references_by_value_[address] = new ReferencesVector;
+    }
+    return references_by_value_[address];
+  };
+
+  inline bool AreReferencesByPropertyLoaded() {
+    return references_by_property_.size() > 0;
+  };
+  inline ReferencesVector* GetReferencesByProperty(std::string property) {
+    if (references_by_property_.count(property) == 0) {
+      references_by_property_[property] = new ReferencesVector;
+    }
+    return references_by_property_[property];
+  };
+
+  inline bool AreReferencesByStringLoaded() {
+    return references_by_string_.size() > 0;
+  };
+  inline ReferencesVector* GetReferencesByString(std::string string_value) {
+    if (references_by_string_.count(string_value) == 0) {
+      references_by_string_[string_value] = new ReferencesVector;
+    }
+    return references_by_string_[string_value];
+  };
+
+  v8::LLV8* llv8_;
 
  private:
   void ScanMemoryRanges(FindJSObjectsVisitor& v);
   void ClearMemoryRanges();
   void ClearMapsToInstances();
+  void ClearReferences();
 
   class MemoryRange {
    public:
     MemoryRange(uint64_t start, uint64_t length)
-        : start_(start), length_(length), next_(nullptr){};
+        : start_(start), length_(length), next_(nullptr) {}
 
     uint64_t start_;
     uint64_t length_;
@@ -122,9 +354,14 @@ class LLScan {
   lldb::SBProcess process_;
   MemoryRange* ranges_ = nullptr;
   TypeRecordMap mapstoinstances_;
+  DetailedTypeRecordMap detailedmapstoinstances_;
+
+  ReferencesByValueMap references_by_value_;
+  ReferencesByPropertyMap references_by_property_;
+  ReferencesByStringMap references_by_string_;
 };
 
-}  // llnode
+}  // namespace llnode
 
 
 #endif  // SRC_LLSCAN_H_
