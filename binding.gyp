@@ -56,22 +56,13 @@
   },
 
   "targets": [{
-    "target_name": "plugin",
-    "type": "shared_library",
-    "sources": [
-      "src/llnode.cc",
-      "src/llv8.cc",
-      "src/llv8-constants.cc",
-      "src/llscan.cc",
-    ]
-  }, {
-    "target_name": "addon",
+    "target_name": "llnodex",
     "type": "loadable_module",
     "include_dirs": [
       "<!(node -e \"require('nan')\")"
     ],
     "sources": [
-      "src/addon.cc",
+      "src/llnodex.cc",
       "src/llnode_module.cc",
       "src/llnode_api.cc",
       "src/llv8.cc",

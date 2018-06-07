@@ -12,7 +12,6 @@
   "scripts": {
     "preinstall": "node scripts/configure.js",
     "install": "node-gyp rebuild",
-    "postinstall": "node scripts/cleanup.js",
     "test": "tape test/*-test.js"
   },
   "repository": {
