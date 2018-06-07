@@ -3,6 +3,8 @@
 
 #include <vector>
 
+#include "src/llnode-common.h"
+
 namespace lldb {
 class SBDebugger;
 class SBTarget;
@@ -22,6 +24,12 @@ public:
   LLNodeApi(LLNode* llnode);
   ~LLNodeApi();
   int LoadCore();
+  uint32_t GetProcessID();
+  uint32_t GetThreadCount();
+  std::string GetProcessState();
+  std::string GetProcessInfo();
+  uint32_t GetFrameCountByThreadId(size_t thread_index);
+  frame_t* GetFrameInfo(size_t thread_index, size_t frame_index);
 
 private:
   LLNode* llnode;

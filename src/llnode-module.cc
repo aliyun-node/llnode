@@ -6,6 +6,8 @@ using ::v8::Value;
 using ::v8::String;
 using ::v8::Local;
 using ::v8::Function;
+using ::v8::Number;
+using ::v8::Array;
 using ::v8::FunctionTemplate;
 
 Nan::Persistent<Function> LLNode::constructor;
@@ -28,6 +30,9 @@ void LLNode::Init(Local<Object> exports) {
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
   // set prototype
   Nan::SetPrototypeMethod(tpl, "loadCore", LoadCore);
+  Nan::SetPrototypeMethod(tpl, "getProcessInfo", GetProcessInfo);
+  Nan::SetPrototypeMethod(tpl, "getThreadByIds", GetThreadByIds);
+  // return js class
   constructor.Reset(tpl->GetFunction());
   exports->Set(Nan::New("LLNode").ToLocalChecked(), tpl->GetFunction());
 }
@@ -57,9 +62,105 @@ core_wrap_t* LLNode::GetCore() {
   return core;
 }
 
+Local<Array> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t limt) {
+  uint32_t frames = api->GetFrameCountByThreadId(thread_index);
+  // pagination
+  size_t current = 0;
+  if(curt > 0)
+    current = curt;
+  size_t limit = 0;
+  if(limt > 0)
+    limit = limt;
+  else
+    limit = frames;
+  if(current >= frames)
+    current = frames;
+  size_t end = current + limit;
+  if(end >= frames)
+    end = frames;
+  // set thread frame
+  Local<Array> frame_list = Nan::New<Array>(end - current);
+  for(size_t frame_index = current; frame_index < end; ++frame_index) {
+    Local<Object> frame = Nan::New<Object>();
+    frame_t* ft = api->GetFrameInfo(thread_index, frame_index);
+    if(ft->type == 1) {
+      native_frame_t* nft = ft->native_frame;
+      frame->Set(Nan::New<String>("symbol").ToLocalChecked(), Nan::New<String>(nft->symbol).ToLocalChecked());
+      frame->Set(Nan::New<String>("function").ToLocalChecked(), Nan::New<String>(nft->function).ToLocalChecked());
+      frame->Set(Nan::New<String>("module").ToLocalChecked(), Nan::New<String>(nft->module_file).ToLocalChecked());
+      frame->Set(Nan::New<String>("compile_unit").ToLocalChecked(), Nan::New<String>(nft->compile_unit_file).ToLocalChecked());
+    }
+    if(ft->type == 2) {
+      js_frame_t* jft = ft->js_frame;
+      frame->Set(Nan::New<String>("symbol").ToLocalChecked(), Nan::New<String>(jft->symbol).ToLocalChecked());
+      if(jft->type == 1) {
+        std::string invalid_js_frame = jft->invalid_js_frame;
+        frame->Set(Nan::New<String>("name").ToLocalChecked(), Nan::New<String>(invalid_js_frame).ToLocalChecked());
+      }
+      if(jft->type == 2) {
+        frame->Set(Nan::New<String>("function").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->function).ToLocalChecked());
+        frame->Set(Nan::New<String>("context").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->context).ToLocalChecked());
+        frame->Set(Nan::New<String>("arguments").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->arguments).ToLocalChecked());
+        frame->Set(Nan::New<String>("line").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->line).ToLocalChecked());
+        frame->Set(Nan::New<String>("func_addr").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->address).ToLocalChecked());
+      }
+    }
+    frame_list->Set(frame_index - current, frame);
+  }
+  return frame_list;
+}
+
 void LLNode::LoadCore(const Nan::FunctionCallbackInfo<Value>& info) {
   LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
   int err = llnode->api->LoadCore();
-  printf("load core result: %d\n", err);
+  if(err == 1) {
+    std::string executable = llnode->core->executable;
+    std::string executable_invaild = "executable [" + executable + "] is not valid!";
+    Nan::ThrowError(Nan::New<String>(executable_invaild).ToLocalChecked());
+    return;
+  }
+  if(err == 2) {
+    std::string core = llnode->core->core;
+    std::string core_invaild = "coredump file [" + core + "] is not valid!";
+    Nan::ThrowError(Nan::New<String>(core_invaild).ToLocalChecked());
+    return;
+  }
+  info.GetReturnValue().Set(Nan::New<Number>(err));
+}
+
+void LLNode::GetProcessInfo(const Nan::FunctionCallbackInfo<Value>& info) {
+  LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
+  Local<Object> result = Nan::New<Object>();
+  uint32_t pid = llnode->api->GetProcessID();
+  result->Set(Nan::New<String>("pid").ToLocalChecked(), Nan::New<Number>(pid));
+  uint32_t thread_count = llnode->api->GetThreadCount();
+  result->Set(Nan::New<String>("thread_count").ToLocalChecked(), Nan::New<Number>(thread_count));
+  std::string state = llnode->api->GetProcessState();
+  result->Set(Nan::New<String>("state").ToLocalChecked(), Nan::New<String>(state).ToLocalChecked());
+  std::string executable = llnode->core->executable;
+  result->Set(Nan::New<String>("executable").ToLocalChecked(), Nan::New<String>(executable).ToLocalChecked());
+  info.GetReturnValue().Set(result);
+}
+
+void LLNode::GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info) {
+  if(!info[0]->IsArray() && !info[0]->IsNumber()) {
+    Nan::ThrowTypeError(Nan::New<String>("argument 0 must be array or number!").ToLocalChecked());
+    info.GetReturnValue().Set(Nan::Undefined());
+    return;
+  }
+  LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
+  size_t current = 0;
+  if(info[1]->IsNumber())
+    current = static_cast<size_t>(info[1]->ToInteger()->Value());
+  size_t limit = 0;
+  if(info[2]->IsNumber())
+    limit = static_cast<size_t>(info[2]->ToInteger()->Value());
+  if(info[0]->IsArray()) {
+
+  } else if(info[0]->IsNumber()) {
+    Local<Array> result = Nan::New<Array>(1);
+    result->Set(0, llnode->GetThreadInfoById(static_cast<size_t>(info[0]->ToInteger()->Value()), current, limit));
+    info.GetReturnValue().Set(result);
+  }
 }
 }

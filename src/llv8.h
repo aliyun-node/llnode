@@ -7,6 +7,7 @@
 #include <lldb/API/LLDB.h>
 
 #include "src/llv8-constants.h"
+#include "src/llnode-common.h"
 
 namespace llnode {
 
@@ -322,6 +323,7 @@ class JSFunction : public JSObject {
   std::string GetDebugLine(std::string args, Error& err);
   std::string Inspect(InspectOptions* options, Error& err);
   std::string GetSource(Error& err);
+  void GetDebugLineX(valid_js_frame_t* vjft, Error& err);
 };
 
 class JSRegExp : public JSObject {
@@ -470,6 +472,9 @@ class JSFrame : public Value {
                                uint32_t& lines_found, Error& err);
   std::string Inspect(bool with_args, Error& err);
   std::string InspectArgs(JSFunction fn, Error& err);
+  void HandleError(js_frame_t* jft);
+  void InspectX(bool with_args, js_frame_t* jft, Error& err);
+  void InspectArgsX(JSFunction fn, valid_js_frame_t*, Error& err);
 
  private:
   Smi FromFrameMarker(Value value) const;
