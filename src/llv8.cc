@@ -6,6 +6,7 @@
 
 #include "llv8-inl.h"
 #include "llv8.h"
+#include "llnode-api.h"
 
 namespace llnode {
 namespace v8 {
@@ -327,6 +328,91 @@ std::string JSFrame::Inspect(bool with_args, Error& err) {
   return fn.GetDebugLine(args, err) + tmp;
 }
 
+void JSFrame::HandleError(js_frame_t* jft) {
+  jft->type = 1;
+  jft->invalid_js_frame = "";
+}
+
+void JSFrame::InspectX(bool with_args, js_frame_t* jft, Error& err) {
+  Value context =
+      v8()->LoadValue<Value>(raw() + v8()->frame()->kContextOffset, err);
+  if (err.Fail()) return HandleError(jft);
+
+  Smi smi_context = FromFrameMarker(context);
+  if (smi_context.Check() &&
+      smi_context.GetValue() == v8()->frame()->kAdaptorFrame) {
+    jft->type = 1;
+    jft->invalid_js_frame = "<adaptor>";
+    return;
+  }
+
+  Value marker =
+      v8()->LoadValue<Value>(raw() + v8()->frame()->kMarkerOffset, err);
+  if (err.Fail()) return HandleError(jft);
+
+  Smi smi_marker = FromFrameMarker(marker);
+  if (smi_marker.Check()) {
+    jft->type = 1;
+    int64_t value = smi_marker.GetValue();
+    if (value == v8()->frame()->kEntryFrame) {
+      jft->invalid_js_frame = "<entry>";
+      return;
+    } else if (value == v8()->frame()->kEntryConstructFrame) {
+      jft->invalid_js_frame = "<entry_construct>";
+      return;
+    } else if (value == v8()->frame()->kExitFrame) {
+      jft->invalid_js_frame = "<exit>";
+      return;
+    } else if (value == v8()->frame()->kInternalFrame) {
+      jft->invalid_js_frame = "<internal>";
+      return;
+    } else if (value == v8()->frame()->kConstructFrame) {
+      jft->invalid_js_frame = "<constructor>";
+      return;
+    } else if (value == v8()->frame()->kStubFrame) {
+      jft->invalid_js_frame = "<stub>";
+      return;
+    } else if (value != v8()->frame()->kJSFrame &&
+               value != v8()->frame()->kOptimizedFrame) {
+      err = Error::Failure("Unknown frame marker %" PRId64, value);
+      jft->invalid_js_frame = "";
+      return;
+    }
+    jft->type = 0;
+  }
+
+  // We are dealing with function or internal code (probably stub)
+  JSFunction fn = GetFunction(err);
+  if (err.Fail()) return HandleError(jft);
+
+  int64_t fn_type = fn.GetType(err);
+  if (err.Fail()) return HandleError(jft);
+
+  if (fn_type == v8()->types()->kCodeType) {
+    jft->type = 1;
+    jft->invalid_js_frame = "<internal code>";
+    return;
+  };
+  if (fn_type != v8()->types()->kJSFunctionType) {
+    jft->type = 1;
+    jft->invalid_js_frame = "<non-function>";
+    return;
+  };
+
+  if (with_args) {
+    jft->valid_js_frame = new valid_js_frame_t;
+    InspectArgsX(fn, jft->valid_js_frame, err);
+    if (err.Fail()) return HandleError(jft);
+  }
+
+  char tmp[128];
+  snprintf(tmp, sizeof(tmp), "0x%016" PRIx64, fn.raw());
+  jft->valid_js_frame->address = tmp;
+  fn.GetDebugLineX(jft->valid_js_frame, err);
+  if (err.Fail()) return HandleError(jft);
+  jft->type = 2;
+}
+
 
 std::string JSFrame::InspectArgs(JSFunction fn, Error& err) {
   SharedFunctionInfo info = fn.Info(err);
@@ -354,6 +440,33 @@ std::string JSFrame::InspectArgs(JSFunction fn, Error& err) {
   return res;
 }
 
+void JSFrame::InspectArgsX(JSFunction fn, valid_js_frame_t* vjft, Error& err) {
+  SharedFunctionInfo info = fn.Info(err);
+  if (err.Fail()) return;
+
+  int64_t param_count = info.ParameterCount(err);
+  if (err.Fail()) return;
+
+  Value receiver = GetReceiver(param_count, err);
+  if (err.Fail()) return;
+
+  InspectOptions options;
+
+  std::string res = receiver.Inspect(&options, err);
+  if (err.Fail()) return;
+  vjft->context = res;
+
+  std::string arguments;
+  for (int64_t i = 0; i < param_count; i++) {
+    Value param = GetParam(i, param_count, err);
+    if (err.Fail()) return;
+
+    arguments += ", " + param.Inspect(&options, err);
+    if (err.Fail()) return;
+  }
+  vjft->arguments = arguments;
+}
+
 
 std::string JSFunction::GetDebugLine(std::string args, Error& err) {
   SharedFunctionInfo info = Info(err);
@@ -372,6 +485,19 @@ std::string JSFunction::GetDebugLine(std::string args, Error& err) {
   if (err.Fail()) return std::string();
 
   return res;
+}
+
+void JSFunction::GetDebugLineX(valid_js_frame_t* vjft, Error& err) {
+  SharedFunctionInfo info = Info(err);
+  if (err.Fail()) return;
+
+  std::string res = info.ProperName(err);
+  if (err.Fail()) return;
+
+  if (!res.empty()) vjft->function = res;
+
+  vjft->line = info.GetPostfix(err);
+  if (err.Fail()) return;
 }
 
 
