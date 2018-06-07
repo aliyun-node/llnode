@@ -1,10 +1,9 @@
 'use strict';
 
-const {
-  fromCoredump,
-  LLNodeHeapType,
-  nextInstance
-} = require('bindings')('addon');
+const llnodex = require('bindings')('llnodex');
+const fromCoredump = llnodex.fromCoredump;
+const LLNodeHeapType = llnodex.LLNodeHeapType;
+const nextInstance = llnodex.nextInstance;
 
 function *next() {
   let instance;
