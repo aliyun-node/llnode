@@ -10,7 +10,7 @@ using ::v8::Local;
 using ::v8::Object;
 using ::v8::Value;
 using ::v8::Function;
-
+using ::v8::Array;
 
 typedef struct {
   char* core;
@@ -29,6 +29,9 @@ private:
   static Nan::Persistent<Function> constructor;
   static void New(const Nan::FunctionCallbackInfo<Value>& info);
   static void LoadCore(const Nan::FunctionCallbackInfo<Value>& info);
+  static void GetProcessInfo(const Nan::FunctionCallbackInfo<Value>& info);
+  static void GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info);
+  Local<Array> GetThreadInfoById(size_t thread_index, size_t curt, size_t limt);
   // core & executable
   LLNodeApi* api;
   core_wrap_t* core;
