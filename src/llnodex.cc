@@ -1,10 +1,10 @@
 #include <nan.h>
+#include "llnode-module.h"
 
 namespace llnode {
-
-NAN_MODULE_INIT(InitAll) {
+void InitAll(::v8::Local<::v8::Object> exports) {
+  LLNode::Init(exports);
 }
 
-NODE_MODULE(addon, InitAll)
-
-}  // namespace llnode
+NODE_MODULE(llnodex, InitAll)
+}
