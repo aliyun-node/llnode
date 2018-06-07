@@ -75,8 +75,6 @@
     ],
     "sources": [
       "src/llnodex.cc",
-      "src/llnode_module.cc",
-      "src/llnode_api.cc",
       "src/llv8.cc",
       "src/llv8-constants.cc",
       "src/llscan.cc"
