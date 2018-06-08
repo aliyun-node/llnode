@@ -156,7 +156,14 @@ void LLNode::GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info) {
   if(info[2]->IsNumber())
     limit = static_cast<size_t>(info[2]->ToInteger()->Value());
   if(info[0]->IsArray()) {
-
+    Local<Object> list = info[0]->ToObject();
+    int length = list->Get(Nan::New<String>("length").ToLocalChecked())->ToInteger()->Value();
+    Local<Array> result = Nan::New<Array>(length);
+    for(int i = 0; i < length; ++i) {
+      size_t thread_index = static_cast<size_t>(list->Get(Nan::New<Number>(i))->ToInteger()->Value());
+      result->Set(i, llnode->GetThreadInfoById(thread_index, current, limit));
+    }
+    info.GetReturnValue().Set(result);
   } else if(info[0]->IsNumber()) {
     Local<Array> result = Nan::New<Array>(1);
     result->Set(0, llnode->GetThreadInfoById(static_cast<size_t>(info[0]->ToInteger()->Value()), current, limit));
