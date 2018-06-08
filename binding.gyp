@@ -77,6 +77,7 @@
       "src/llnodex.cc",
       "src/llnode-module.cc",
       "src/llnode-api.cc",
+      "src/llnode-common.cc",
       "src/llnode.cc",
       "src/llv8.cc",
       "src/llv8-constants.cc",

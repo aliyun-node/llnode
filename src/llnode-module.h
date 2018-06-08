@@ -31,10 +31,13 @@ private:
   static void LoadCore(const Nan::FunctionCallbackInfo<Value>& info);
   static void GetProcessInfo(const Nan::FunctionCallbackInfo<Value>& info);
   static void GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info);
+  static void GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info);
   Local<Array> GetThreadInfoById(size_t thread_index, size_t curt, size_t limt);
   // core & executable
   LLNodeApi* api;
   core_wrap_t* core;
+  // lazy heap scanning
+  bool heap_initialized = false;
 };
 }
 

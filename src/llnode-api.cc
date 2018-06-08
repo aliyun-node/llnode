@@ -24,6 +24,7 @@ using lldb::SBStream;
 using lldb::SBThread;
 using lldb::SBFrame;
 using lldb::SBSymbol;
+using lldb::SBCommandReturnObject;
 using lldb::StateType;
 
 LLNodeApi::LLNodeApi(LLNode* llnode)
@@ -165,5 +166,49 @@ frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
   }
   frame_map.insert(FrameMap::value_type(key, ft));
   return ft;
+}
+
+bool LLNodeApi::ScanHeap() {
+  SBCommandReturnObject result;
+  if (!llscan->ScanHeapForObjects(*target, result)) {
+    return false;
+  }
+  return true;
+}
+
+void LLNodeApi::CacheAndSortHeap() {
+  object_types.clear();
+  for (const auto& kv : llscan->GetMapsToInstances()) {
+    // put TypeRecord*
+    object_types.push_back(kv.second);
+  }
+  // sort by count
+  std::sort(object_types.begin(), object_types.end(),
+            TypeRecord::CompareInstanceCounts);
+}
+
+uint32_t LLNodeApi::GetHeapTypeCount() {
+  return object_types.size();
+}
+
+std::string LLNodeApi::GetTypeName(size_t type_index) {
+  if (object_types.size() <= type_index) {
+    return "";
+  }
+  return object_types[type_index]->GetTypeName();
+}
+
+uint32_t LLNodeApi::GetTypeInstanceCount(size_t type_index) {
+  if (object_types.size() <= type_index) {
+    return 0;
+  }
+  return object_types[type_index]->GetInstanceCount();
+}
+
+uint32_t LLNodeApi::GetTypeTotalSize(size_t type_index) {
+  if (object_types.size() <= type_index) {
+    return 0;
+  }
+  return object_types[type_index]->GetTotalInstanceSize();
 }
 }
