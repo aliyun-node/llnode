@@ -35,6 +35,16 @@ typedef struct {
     js_frame_t* js_frame;
   };
 } frame_t;
+
+class LLMonitor {
+public:
+  explicit LLMonitor();
+  ~LLMonitor();
+  void SetProgress(double progress);
+  double GetProgress();
+private:
+  double progress;
+};
 }
 
 #endif
