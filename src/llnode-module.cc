@@ -32,6 +32,7 @@ void LLNode::Init(Local<Object> exports) {
   Nan::SetPrototypeMethod(tpl, "loadCore", LoadCore);
   Nan::SetPrototypeMethod(tpl, "getProcessInfo", GetProcessInfo);
   Nan::SetPrototypeMethod(tpl, "getThreadByIds", GetThreadByIds);
+  Nan::SetPrototypeMethod(tpl, "getJsObjects", GetJsObjects);
   // return js class
   constructor.Reset(tpl->GetFunction());
   exports->Set(Nan::New("LLNode").ToLocalChecked(), tpl->GetFunction());
@@ -169,5 +170,42 @@ void LLNode::GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info) {
     result->Set(0, llnode->GetThreadInfoById(static_cast<size_t>(info[0]->ToInteger()->Value()), current, limit));
     info.GetReturnValue().Set(result);
   }
+}
+
+void LLNode::GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info) {
+  LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
+  if (!llnode->heap_initialized) {
+    // TODO: scan heap needed working in child thread if we can
+    if(!llnode->api->ScanHeap()) {
+      Nan::ThrowTypeError(Nan::New<String>("scan heap error!").ToLocalChecked());
+      info.GetReturnValue().Set(Nan::Undefined());
+      return;
+    }
+    llnode->api->CacheAndSortHeap();
+    llnode->heap_initialized = true;
+  }
+  uint32_t type_count = llnode->api->GetHeapTypeCount();
+  uint32_t current = 0;
+  if(info[0]->IsNumber())
+    current = Nan::To<uint32_t>(info[0]).FromJust();
+  uint32_t limit = 0;
+  if(info[1]->IsNumber())
+    limit = Nan::To<uint32_t>(info[1]).FromJust();
+  else
+    limit = type_count;
+  if(current >= type_count)
+    current = type_count;
+  uint32_t end = current + limit;
+  if(end >= type_count)
+    end = type_count;
+  Local<Array> object_list = Nan::New<Array>(end - current);
+  for(uint32_t i = current; i < end; ++i) {
+    Local<Object> type = Nan::New<Object>();
+    type->Set(Nan::New<String>("name").ToLocalChecked(), Nan::New<String>(llnode->api->GetTypeName(i)).ToLocalChecked());
+    type->Set(Nan::New<String>("count").ToLocalChecked(), Nan::New<Number>(llnode->api->GetTypeInstanceCount(i)));
+    type->Set(Nan::New<String>("size").ToLocalChecked(), Nan::New<Number>(llnode->api->GetTypeTotalSize(i)));
+    object_list->Set(i - current, type);
+  }
+  info.GetReturnValue().Set(object_list);
 }
 }
