@@ -2,6 +2,7 @@
 #define SRC_LLNODE_API_H
 
 #include <vector>
+#include <unordered_map>
 
 #include "src/llnode-common.h"
 
@@ -18,6 +19,8 @@ class LLScan;
 namespace v8 {
 class LLV8;
 }
+
+typedef std::unordered_map<long long, frame_t*> FrameMap;
 
 class LLNodeApi {
 public:
@@ -40,6 +43,7 @@ private:
   std::unique_ptr<lldb::SBProcess> process;
   std::unique_ptr<v8::LLV8> llv8;
   std::unique_ptr<LLScan> llscan;
+  FrameMap frame_map;
 };
 
 }
