@@ -114,6 +114,10 @@ uint32_t LLNodeApi::GetFrameCountByThreadId(size_t thread_index) {
 }
 
 frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
+  long long key = (static_cast<long long>(thread_index) << 32) + frame_index;
+  if(frame_map.count(key) != 0) {
+    return frame_map.at(key);
+  }
   SBThread thread = process->GetThreadAtIndex(thread_index);
   SBFrame frame = thread.GetFrameAtIndex(frame_index);
   SBSymbol symbol = frame.GetSymbol();
@@ -159,6 +163,7 @@ frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
       ft->js_frame->symbol = "JavaScript";
     }
   }
+  frame_map.insert(FrameMap::value_type(key, ft));
   return ft;
 }
 }
