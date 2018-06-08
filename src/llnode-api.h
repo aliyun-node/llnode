@@ -15,6 +15,7 @@ class SBProcess;
 namespace llnode {
 class LLNode;
 class LLScan;
+class TypeRecord;
 
 namespace v8 {
 class LLV8;
@@ -33,6 +34,12 @@ public:
   std::string GetProcessInfo();
   uint32_t GetFrameCountByThreadId(size_t thread_index);
   frame_t* GetFrameInfo(size_t thread_index, size_t frame_index);
+  bool ScanHeap();
+  void CacheAndSortHeap();
+  uint32_t GetHeapTypeCount();
+  std::string GetTypeName(size_t type_index);
+  uint32_t GetTypeInstanceCount(size_t type_index);
+  uint32_t GetTypeTotalSize(size_t type_index);
 
 private:
   LLNode* llnode;
@@ -44,6 +51,7 @@ private:
   std::unique_ptr<v8::LLV8> llv8;
   std::unique_ptr<LLScan> llscan;
   FrameMap frame_map;
+  std::vector<TypeRecord*> object_types;
 };
 
 }
