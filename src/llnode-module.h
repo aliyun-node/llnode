@@ -17,6 +17,14 @@ typedef struct {
   char* executable;
 } core_wrap_t;
 
+template <typename T>
+struct pagination_t {
+  T current;
+  T end;
+};
+template <typename T>
+pagination_t<T>* GetPagination(Local<Value> in_curt, Local<Value> in_limt, T length);
+
 class LLNode : public Nan::ObjectWrap {
 public:
   static void Init(Local<Object> exports);
@@ -32,7 +40,10 @@ private:
   static void GetProcessInfo(const Nan::FunctionCallbackInfo<Value>& info);
   static void GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info);
   static void GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info);
+  static void GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info);
   Local<Array> GetThreadInfoById(size_t thread_index, size_t curt, size_t limt);
+  bool ScanHeap();
+
   // core & executable
   LLNodeApi* api;
   core_wrap_t* core;
