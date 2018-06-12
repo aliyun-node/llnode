@@ -16,6 +16,8 @@
 #include "src/llv8.h"
 
 namespace llnode {
+using std::set;
+using std::string;
 using v8::LLV8;
 using lldb::SBDebugger;
 using lldb::SBTarget;
@@ -146,9 +148,9 @@ frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
   } else {
     ft->type = 2;
     // V8 frame
-    llnode::v8::Error err;
-    llnode::v8::JSFrame v8_frame(llscan->v8(),
-                                 static_cast<int64_t>(frame.GetFP()));
+    v8::Error err;
+    v8::JSFrame v8_frame(llscan->v8(),
+                         static_cast<int64_t>(frame.GetFP()));
     ft->js_frame = new js_frame_t;
     v8_frame.InspectX(true, ft->js_frame, err);
     bool invalid = ft->js_frame->type == 1;
@@ -211,4 +213,41 @@ uint32_t LLNodeApi::GetTypeTotalSize(size_t type_index) {
   }
   return object_types[type_index]->GetTotalInstanceSize();
 }
+
+string** LLNodeApi::GetTypeInstances(size_t type_index) {
+  if(instances_map.count(type_index) != 0) {
+    return instances_map.at(type_index);
+  }
+  if (object_types.size() <= type_index) {
+    return nullptr;
+  }
+  uint32_t length = object_types[type_index]->GetInstanceCount();
+  string** instances = new string*[length];
+  std::set<uint64_t> list = object_types[type_index]->GetInstances();
+  uint32_t index = 0;
+  for(auto it = list.begin(); it != list.end(); ++it) {
+    char buf[20];
+    snprintf(buf, sizeof(buf), "0x%016" PRIx64, (*it));
+    string* addr = new string(buf);
+    if(index < length)
+      instances[index++] = addr;
+  }
+  instances_map.insert(InstancesMap::value_type(type_index, instances));
+  return instances;
+}
+
+std::string LLNodeApi::GetObject(uint64_t address, bool detailed) {
+  v8::Value v8_value(llscan->v8(), address);
+  v8::Value::InspectOptions inspect_options;
+  inspect_options.detailed = detailed;
+  inspect_options.length = 200;
+  inspect_options.start_address = address;
+
+  v8::Error err;
+  std::string result = v8_value.Inspect(&inspect_options, err);
+  if (err.Fail()) {
+    return "Failed to get object";
+  }
+  return result;
+}  // namespace llnode
 }

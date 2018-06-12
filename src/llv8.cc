@@ -938,11 +938,16 @@ std::string HeapObject::Inspect(InspectOptions* options, Error& err) {
   if (options->print_map) {
     HeapObject map = GetMap(err);
     if (err.Fail()) return std::string();
-
-    snprintf(buf, sizeof(buf), "0x%016" PRIx64 "(map=0x%016" PRIx64 "):", raw(),
-             map.raw());
-  } else {
+    if(options->start_address != raw()) {
+      snprintf(buf, sizeof(buf), "(map=0x%016" PRIx64 "):" ,map.raw());
+    } else {
+      snprintf(buf, sizeof(buf), "0x%016" PRIx64 "(map=0x%016" PRIx64 "):", raw(),
+      map.raw());
+    }
+  } else if(options->start_address != raw()) {
     snprintf(buf, sizeof(buf), "0x%016" PRIx64 ":", raw());
+  } else {
+    snprintf(buf, sizeof(buf), "");
   }
   std::string pre = buf;
 

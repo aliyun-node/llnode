@@ -73,6 +73,7 @@ class Value {
     bool print_map;
     bool print_source;
     unsigned int length;
+    int64_t start_address;
   };
 
   Value(const Value& v) = default;
