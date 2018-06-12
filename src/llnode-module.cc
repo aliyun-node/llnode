@@ -10,6 +10,27 @@ using ::v8::Number;
 using ::v8::Array;
 using ::v8::FunctionTemplate;
 
+template <typename T>
+pagination_t<T>* GetPagination(Local<Value> in_curt, Local<Value> in_limt, T length) {
+  pagination_t<T>* pagination = new pagination_t<T>;
+  T current = 0;
+  if(in_curt->IsNumber())
+    current = static_cast<T>(in_curt->ToInteger()->Value());
+  T limit = 0;
+  if(in_limt->IsNumber())
+    limit = static_cast<T>(in_limt->ToInteger()->Value());
+  else
+    limit = length;
+  if(current >= length)
+    current = length;
+  T end = current + limit;
+  if(end >= length)
+    end = length;
+  pagination->current = current;
+  pagination->end = end;
+  return pagination;
+}
+
 Nan::Persistent<Function> LLNode::constructor;
 
 LLNode::LLNode(char* core_path, char* executable_path)
@@ -33,6 +54,7 @@ void LLNode::Init(Local<Object> exports) {
   Nan::SetPrototypeMethod(tpl, "getProcessInfo", GetProcessInfo);
   Nan::SetPrototypeMethod(tpl, "getThreadByIds", GetThreadByIds);
   Nan::SetPrototypeMethod(tpl, "getJsObjects", GetJsObjects);
+  Nan::SetPrototypeMethod(tpl, "getJsInstances", GetJsInstances);
   // return js class
   constructor.Reset(tpl->GetFunction());
   exports->Set(Nan::New("LLNode").ToLocalChecked(), tpl->GetFunction());
@@ -61,6 +83,18 @@ void LLNode::New(const Nan::FunctionCallbackInfo<Value>& info) {
 
 core_wrap_t* LLNode::GetCore() {
   return core;
+}
+
+bool LLNode::ScanHeap() {
+  if (!heap_initialized) {
+    // TODO: scan heap needed working in child thread if we can
+    if(!api->ScanHeap()) {
+      return false;
+    }
+    api->CacheAndSortHeap();
+    heap_initialized = true;
+  }
+  return true;
 }
 
 Local<Array> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t limt) {
@@ -145,7 +179,7 @@ void LLNode::GetProcessInfo(const Nan::FunctionCallbackInfo<Value>& info) {
 
 void LLNode::GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info) {
   if(!info[0]->IsArray() && !info[0]->IsNumber()) {
-    Nan::ThrowTypeError(Nan::New<String>("argument 0 must be array or number!").ToLocalChecked());
+    Nan::ThrowTypeError(Nan::New<String>("thread index(list) must be array or number!").ToLocalChecked());
     info.GetReturnValue().Set(Nan::Undefined());
     return;
   }
@@ -174,15 +208,10 @@ void LLNode::GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info) {
 
 void LLNode::GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info) {
   LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
-  if (!llnode->heap_initialized) {
-    // TODO: scan heap needed working in child thread if we can
-    if(!llnode->api->ScanHeap()) {
-      Nan::ThrowTypeError(Nan::New<String>("scan heap error!").ToLocalChecked());
-      info.GetReturnValue().Set(Nan::Undefined());
-      return;
-    }
-    llnode->api->CacheAndSortHeap();
-    llnode->heap_initialized = true;
+  if(!llnode->ScanHeap()) {
+    Nan::ThrowTypeError(Nan::New<String>("scan heap error!").ToLocalChecked());
+    info.GetReturnValue().Set(Nan::Undefined());
+    return;
   }
   uint32_t type_count = llnode->api->GetHeapTypeCount();
   uint32_t current = 0;
@@ -201,11 +230,43 @@ void LLNode::GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info) {
   Local<Array> object_list = Nan::New<Array>(end - current);
   for(uint32_t i = current; i < end; ++i) {
     Local<Object> type = Nan::New<Object>();
+    type->Set(Nan::New<String>("index").ToLocalChecked(), Nan::New<Number>(i));
     type->Set(Nan::New<String>("name").ToLocalChecked(), Nan::New<String>(llnode->api->GetTypeName(i)).ToLocalChecked());
     type->Set(Nan::New<String>("count").ToLocalChecked(), Nan::New<Number>(llnode->api->GetTypeInstanceCount(i)));
     type->Set(Nan::New<String>("size").ToLocalChecked(), Nan::New<Number>(llnode->api->GetTypeTotalSize(i)));
     object_list->Set(i - current, type);
   }
   info.GetReturnValue().Set(object_list);
+}
+void LLNode::GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info) {
+  if(!info[0]->IsNumber()) {
+    Nan::ThrowTypeError(Nan::New<String>("instance index must be number!").ToLocalChecked());
+    info.GetReturnValue().Set(Nan::Undefined());
+    return;
+  }
+  LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
+  if(!llnode->ScanHeap()) {
+    Nan::ThrowTypeError(Nan::New<String>("scan heap error!").ToLocalChecked());
+    info.GetReturnValue().Set(Nan::Undefined());
+    return;
+  }
+  size_t instance_index = static_cast<size_t>(info[0]->ToInteger()->Value());
+  uint32_t instance_count = llnode->api->GetTypeInstanceCount(instance_index);
+  pagination_t<uint32_t>* pagination = GetPagination<uint32_t>(info[1], info[2], instance_count);
+  uint32_t current = pagination->current;
+  uint32_t end = pagination->end;
+  std::string** instances = llnode->api->GetTypeInstances(instance_index);
+  Local<Array> result = Nan::New<Array>(end - current);
+  for(uint32_t i = current; i < end; ++i) {
+    Local<Object> ins = Nan::New<Object>();
+    std::string addr_str = *instances[i];
+    ins->Set(Nan::New<String>("address").ToLocalChecked(), Nan::New<String>(addr_str).ToLocalChecked());
+    uint64_t addr = std::strtoull(addr_str.c_str(), nullptr, 16);
+    std::string desc = llnode->api->GetObject(addr, false);
+    ins->Set(Nan::New<String>("desc").ToLocalChecked(), Nan::New<String>(desc).ToLocalChecked());
+    result->Set(i - current, ins);
+  }
+  delete pagination;
+  info.GetReturnValue().Set(result);
 }
 }

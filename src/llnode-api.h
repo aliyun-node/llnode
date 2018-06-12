@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <cinttypes>
 
 #include "src/llnode-common.h"
 
@@ -22,6 +23,7 @@ class LLV8;
 }
 
 typedef std::unordered_map<long long, frame_t*> FrameMap;
+typedef std::unordered_map<size_t, std::string**> InstancesMap;
 
 class LLNodeApi {
 public:
@@ -40,6 +42,8 @@ public:
   std::string GetTypeName(size_t type_index);
   uint32_t GetTypeInstanceCount(size_t type_index);
   uint32_t GetTypeTotalSize(size_t type_index);
+  std::string** GetTypeInstances(size_t type_index);
+  std::string GetObject(uint64_t address, bool detailed);
 
 private:
   LLNode* llnode;
@@ -50,10 +54,10 @@ private:
   std::unique_ptr<lldb::SBProcess> process;
   std::unique_ptr<v8::LLV8> llv8;
   std::unique_ptr<LLScan> llscan;
-  FrameMap frame_map;
   std::vector<TypeRecord*> object_types;
+  FrameMap frame_map;
+  InstancesMap instances_map;
 };
-
 }
 
 #endif
