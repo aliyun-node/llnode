@@ -90,6 +90,7 @@ class Value {
   bool IsHole(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
+  inspect_t* InspectX(InspectOptions* options, Error& err);
   std::string GetTypeName(Error& err);
   std::string ToString(Error& err);
 
@@ -109,6 +110,7 @@ class Smi : public Value {
 
   std::string ToString(Error& err);
   std::string Inspect(Error& err);
+  smi_t* InspectX(Error& err);
 };
 
 class HeapObject : public Value {
@@ -127,6 +129,7 @@ class HeapObject : public Value {
 
   std::string ToString(Error& err);
   std::string Inspect(InspectOptions* options, Error& err);
+  inspect_t* InspectX(InspectOptions* options, Error& err);
   std::string GetTypeName(Error& err);
 };
 
@@ -148,6 +151,7 @@ class Map : public HeapObject {
   inline int64_t NumberOfOwnDescriptors(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
+  map_t* InspectX(InspectOptions* options, Error& err);
   HeapObject Constructor(Error& err);
 };
 
@@ -161,6 +165,7 @@ class String : public HeapObject {
 
   std::string ToString(Error& err);
   std::string Inspect(InspectOptions* options, Error& err);
+  first_non_string_t* InspectX(InspectOptions* options, Error& err);
 
   static inline bool IsString(LLV8* v8, HeapObject heap_object, Error& err);
 };
@@ -261,6 +266,7 @@ class HeapNumber : public HeapObject {
 
   std::string ToString(bool whole, Error& err);
   std::string Inspect(Error& err);
+  heap_number_t* InspectX(Error& err);
 };
 
 class JSObject : public HeapObject {
@@ -271,13 +277,19 @@ class JSObject : public HeapObject {
   inline HeapObject Elements(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
+  js_object_t* InspectX(InspectOptions* options, Error& err);
   std::string InspectInternalFields(Error& err);
+  internal_fileds_t* InspectInternalFieldsX(Error& err);
   std::string InspectProperties(Error& err);
 
   std::string InspectElements(Error& err);
+  elements_t* InspectElementsX(Error& err);
   std::string InspectElements(int64_t length, Error& err);
+  elements_t* InspectElementsX(int64_t length, Error& err);
   std::string InspectDictionary(Error& err);
+  properties_t* InspectDictionaryX(Error& err);
   std::string InspectDescriptors(Map map, Error& err);
+  properties_t* InspectDescriptorsX(Map map, Error& err);
   void Keys(std::vector<std::string>& keys, Error& err);
 
   /** Return all the key/value pairs for properties on a JSObject
@@ -311,6 +323,7 @@ class JSArray : public JSObject {
   inline Smi Length(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
+  js_array_t* InspectX(InspectOptions* options, Error& err);
 };
 
 class JSFunction : public JSObject {
@@ -323,6 +336,7 @@ class JSFunction : public JSObject {
 
   std::string GetDebugLine(std::string args, Error& err);
   std::string Inspect(InspectOptions* options, Error& err);
+  js_function_t* InspectX(InspectOptions* options, Error& err);
   std::string GetSource(Error& err);
   void GetDebugLineX(valid_js_frame_t* vjft, Error& err);
 };
@@ -334,6 +348,7 @@ class JSRegExp : public JSObject {
   inline String GetSource(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
+  inspect_t* InspectX(InspectOptions* options, Error& err);
 };
 
 class JSDate : public JSObject {
@@ -343,6 +358,7 @@ class JSDate : public JSObject {
   inline Value GetValue(Error& err);
 
   std::string Inspect(Error& err);
+  js_date_t* InspectX(Error& err);
 };
 
 class FixedArrayBase : public HeapObject {
@@ -362,6 +378,7 @@ class FixedArray : public FixedArrayBase {
   inline int64_t LeaData() const;
 
   std::string Inspect(InspectOptions* options, Error& err);
+  fixed_array_t* InspectX(InspectOptions* options, Error& err);
 
  private:
   std::string InspectContents(int length, Error& err);
@@ -409,6 +426,7 @@ class Context : public FixedArray {
   inline Value ContextSlot(int index, Error& err);
 
   std::string Inspect(Error& err);
+  context_t* InspectX(Error& err);
 };
 
 class ScopeInfo : public FixedArray {
@@ -433,6 +451,7 @@ class Oddball : public HeapObject {
   inline bool IsHole(Error& err);
 
   std::string Inspect(Error& err);
+  odd_ball_t* InspectX(Error& err);
 };
 
 class JSArrayBuffer : public JSObject {
@@ -446,6 +465,7 @@ class JSArrayBuffer : public JSObject {
   inline bool WasNeutered(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
+  js_array_buffer_t* InspectX(InspectOptions* options, Error& err);
 };
 
 class JSArrayBufferView : public JSObject {
@@ -457,6 +477,7 @@ class JSArrayBufferView : public JSObject {
   inline Smi ByteLength(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
+  js_array_buffer_view_t* InspectX(InspectOptions* options, Error& err);
 };
 
 class JSFrame : public Value {
@@ -496,6 +517,7 @@ class LLV8 {
   int64_t LoadUnsigned(int64_t addr, uint32_t byte_size, Error& err);
   double LoadDouble(int64_t addr, Error& err);
   std::string LoadBytes(int64_t addr, int64_t length, Error& err);
+  std::string* LoadBytesX(int64_t addr, int64_t length, Error& err);
   std::string LoadString(int64_t addr, int64_t length, Error& err);
   std::string LoadTwoByteString(int64_t addr, int64_t length, Error& err);
   uint8_t* LoadChunk(int64_t addr, int64_t length, Error& err);
