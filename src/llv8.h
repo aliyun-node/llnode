@@ -315,6 +315,7 @@ class JSFunction : public JSObject {
   inline std::string Name(Error& err);
 
   std::string GetDebugLine(std::string args, Error& err);
+  js_function_debug_t* GetDebugLineX(Error& err);
   std::string Inspect(InspectOptions* options, Error& err);
   js_function_t* InspectX(InspectOptions* options, Error& err);
   std::string GetSource(Error& err);
@@ -435,7 +436,7 @@ class Oddball : public HeapObject {
   inline bool IsHole(Error& err);
 
   std::string Inspect(Error& err);
-  odd_ball_t* InspectX(Error& err);
+  oddball_t* InspectX(Error& err);
 };
 
 class JSArrayBuffer : public JSObject {
