@@ -99,7 +99,8 @@ bool LLNode::ScanHeap() {
   return true;
 }
 
-Local<Array> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t limt) {
+Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t limt) {
+  Local<Object> result = Nan::New<Object>();
   uint32_t frames = api->GetFrameCountByThreadId(thread_index);
   // pagination
   size_t current = 0;
@@ -144,7 +145,14 @@ Local<Array> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t 
     }
     frame_list->Set(frame_index - current, frame);
   }
-  return frame_list;
+  if(end >= frames)
+    result->Set(Nan::New<String>("frame_end").ToLocalChecked(), Nan::New<Boolean>(true));
+  else {
+    result->Set(Nan::New<String>("frame_end").ToLocalChecked(), Nan::New<Boolean>(false));
+    result->Set(Nan::New<String>("frame_left").ToLocalChecked(), Nan::New<Number>(frames - end));
+  }
+  result->Set(Nan::New<String>("frame_list").ToLocalChecked(), frame_list);
+  return result;
 }
 
 Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
@@ -433,6 +441,7 @@ void LLNode::GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info) {
   pagination_t<uint32_t>* pagination = GetPagination<uint32_t>(info[0], info[1], type_count);
   uint32_t current = pagination->current;
   uint32_t end = pagination->end;
+  Local<Object> result = Nan::New<Object>();
   Local<Array> object_list = Nan::New<Array>(end - current);
   for(uint32_t i = current; i < end; ++i) {
     Local<Object> type = Nan::New<Object>();
@@ -443,7 +452,14 @@ void LLNode::GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info) {
     object_list->Set(i - current, type);
   }
   delete pagination;
-  info.GetReturnValue().Set(object_list);
+  if(end >= type_count)
+    result->Set(Nan::New<String>("object_end").ToLocalChecked(), Nan::New<Boolean>(true));
+  else {
+    result->Set(Nan::New<String>("object_end").ToLocalChecked(), Nan::New<Boolean>(false));
+    result->Set(Nan::New<String>("object_left").ToLocalChecked(), Nan::New<Number>(type_count - end));
+  }
+  result->Set(Nan::New<String>("object_list").ToLocalChecked(), object_list);
+  info.GetReturnValue().Set(result);
 }
 void LLNode::GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info) {
   if(!info[0]->IsNumber()) {
@@ -463,7 +479,8 @@ void LLNode::GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info) {
   uint32_t current = pagination->current;
   uint32_t end = pagination->end;
   std::string** instances = llnode->api->GetTypeInstances(instance_index);
-  Local<Array> result = Nan::New<Array>(end - current);
+  Local<Object> result = Nan::New<Object>();
+  Local<Array> instance_list = Nan::New<Array>(end - current);
   for(uint32_t i = current; i < end; ++i) {
     Local<Object> ins = Nan::New<Object>();
     std::string addr_str = *instances[i];
@@ -471,9 +488,16 @@ void LLNode::GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info) {
     uint64_t addr = std::strtoull(addr_str.c_str(), nullptr, 16);
     std::string desc = llnode->api->GetObject(addr, false);
     ins->Set(Nan::New<String>("desc").ToLocalChecked(), Nan::New<String>(desc).ToLocalChecked());
-    result->Set(i - current, ins);
+    instance_list->Set(i - current, ins);
   }
   delete pagination;
+  if(end >= instance_count)
+    result->Set(Nan::New<String>("instance_end").ToLocalChecked(), Nan::New<Boolean>(true));
+  else {
+    result->Set(Nan::New<String>("instance_end").ToLocalChecked(), Nan::New<Boolean>(false));
+    result->Set(Nan::New<String>("instance_left").ToLocalChecked(), Nan::New<Number>(instance_count - end));
+  }
+  result->Set(Nan::New<String>("instance_list").ToLocalChecked(), instance_list);
   info.GetReturnValue().Set(result);
 }
 
