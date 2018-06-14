@@ -240,7 +240,7 @@ std::string LLNodeApi::GetObject(uint64_t address, bool detailed) {
   v8::Value v8_value(llscan->v8(), address);
   v8::Value::InspectOptions inspect_options;
   inspect_options.detailed = detailed;
-  inspect_options.length = 200;
+  inspect_options.length = 100;
   inspect_options.start_address = address;
 
   v8::Error err;
@@ -249,5 +249,18 @@ std::string LLNodeApi::GetObject(uint64_t address, bool detailed) {
     return "Failed to get object";
   }
   return result;
-}  // namespace llnode
+}
+
+inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
+  v8::Value v8_value(llscan->v8(), address);
+  v8::Value::InspectOptions inspect_options;
+  inspect_options.detailed = detailed;
+  inspect_options.length = 100;
+  inspect_options.start_address = address;
+
+  v8::Error err;
+  inspect_t* result = v8_value.InspectX(&inspect_options, err);
+  if (err.Fail()) return nullptr;
+  return result;
+}
 }

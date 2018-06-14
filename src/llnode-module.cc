@@ -8,6 +8,7 @@ using ::v8::Local;
 using ::v8::Function;
 using ::v8::Number;
 using ::v8::Array;
+using ::v8::Boolean;
 using ::v8::FunctionTemplate;
 
 template <typename T>
@@ -55,6 +56,7 @@ void LLNode::Init(Local<Object> exports) {
   Nan::SetPrototypeMethod(tpl, "getThreadByIds", GetThreadByIds);
   Nan::SetPrototypeMethod(tpl, "getJsObjects", GetJsObjects);
   Nan::SetPrototypeMethod(tpl, "getJsInstances", GetJsInstances);
+  Nan::SetPrototypeMethod(tpl, "inspectJsObjectAtAddress", InspectJsObjectAtAddress);
   // return js class
   constructor.Reset(tpl->GetFunction());
   exports->Set(Nan::New("LLNode").ToLocalChecked(), tpl->GetFunction());
@@ -143,6 +145,220 @@ Local<Array> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t 
     frame_list->Set(frame_index - current, frame);
   }
   return frame_list;
+}
+
+Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
+  InspectType type = inspect->type;
+  std::string name = inspect->name;
+  std::string address = inspect->address;
+  std::string map_address = inspect->map_address;
+  Local<Object> result = Nan::New<Object>();
+  result->Set(Nan::New<String>("type").ToLocalChecked(), Nan::New<Number>(type));
+  result->Set(Nan::New<String>("name").ToLocalChecked(), Nan::New<String>(name).ToLocalChecked());
+  result->Set(Nan::New<String>("address").ToLocalChecked(), Nan::New<String>(address).ToLocalChecked());
+  result->Set(Nan::New<String>("map_address").ToLocalChecked(), Nan::New<String>(map_address).ToLocalChecked());
+  switch(type) {
+  case InspectType::kGlobalObject:
+  case InspectType::kGlobalProxy:
+  case InspectType::kCode:
+  case InspectType::kUnknown:
+    break;
+  case InspectType::kSmi: {
+    smi_t* smi = static_cast<smi_t*>(inspect);
+    result->Set(Nan::New<String>("value").ToLocalChecked(),
+                Nan::New<String>(smi->value).ToLocalChecked());
+    break;
+  }
+  case InspectType::kMap: {
+    map_t* map = static_cast<map_t*>(inspect);
+    result->Set(Nan::New<String>("constructor").ToLocalChecked(),
+                Nan::New<String>(map->in_object_properties_or_constructor).ToLocalChecked());
+    result->Set(Nan::New<String>("constructor_index").ToLocalChecked(),
+                Nan::New<Number>(map->in_object_properties_or_constructor_index));
+    result->Set(Nan::New<String>("size").ToLocalChecked(),
+                Nan::New<Number>(map->instance_size));
+    result->Set(Nan::New<String>("descriptors_address").ToLocalChecked(),
+                Nan::New<String>(map->descriptors_address).ToLocalChecked());
+    result->Set(Nan::New<String>("descriptors_length").ToLocalChecked(),
+                Nan::New<Number>(map->own_descriptors));
+    result->Set(Nan::New<String>("descriptors").ToLocalChecked(),
+                InspectJsObject(map->descriptors_array));
+    break;
+  }
+  case InspectType::kFixedArray: {
+    fixed_array_t* fixed_array = static_cast<fixed_array_t*>(inspect);
+    Local<Array> array = Nan::New<Array>(fixed_array->length);
+    for(int i = 0; i < fixed_array->length; ++i) {
+      array->Set(i, InspectJsObject(*(fixed_array->content + i)));
+    }
+    result->Set(Nan::New<String>("length").ToLocalChecked(),
+                Nan::New<Number>(fixed_array->length));
+    result->Set(Nan::New<String>("array").ToLocalChecked(), array);
+    break;
+  }
+  case InspectType::kJsObject: {
+    js_object_t* js_object = static_cast<js_object_t*>(inspect);
+    result->Set(Nan::New<String>("constructor").ToLocalChecked(),
+                Nan::New<String>(js_object->constructor).ToLocalChecked());
+    if(js_object->elements != nullptr) {
+      Local<Array> elements = Nan::New<Array>(js_object->elements->length);
+      for(int i = 0; i < js_object->elements->length; ++i) {
+        elements->Set(i, InspectJsObject(*(js_object->elements->elements + i)));
+      }
+      result->Set(Nan::New<String>("elements").ToLocalChecked(), elements);
+    }
+    if(js_object->properties != nullptr) {
+      Local<Object> properties = Nan::New<Object>();
+      properties_t* props = js_object->properties;
+      for(int i = 0; i < props->length; ++i) {
+        property_t* prop = *(props->properties + i);
+        // ignore hole
+        if(prop == nullptr) continue;
+        if(prop->value == nullptr)
+          properties->Set(Nan::New<String>(prop->key).ToLocalChecked(),
+                          Nan::New<String>(prop->value_str).ToLocalChecked());
+        else
+          properties->Set(Nan::New<String>(prop->key).ToLocalChecked(),
+                          InspectJsObject(prop->value));
+      }
+      result->Set(Nan::New<String>("properties").ToLocalChecked(), properties);
+    }
+    if(js_object->fields != nullptr) {
+      internal_fileds_t* ifield = js_object->fields;
+      Local<Array> fields = Nan::New<Array>(ifield->length);
+      for(int i = 0; i < ifield->length; ++i) {
+        fields->Set(i, Nan::New<String>((*(ifield->internal_fileds + i))->address).ToLocalChecked());
+      }
+      result->Set(Nan::New<String>("internal_fields").ToLocalChecked(), fields);
+    }
+    break;
+  }
+  case InspectType::kHeapNumber: {
+    heap_number_t* heap_number = static_cast<heap_number_t*>(inspect);
+    result->Set(Nan::New<String>("value").ToLocalChecked(),
+                Nan::New<String>(heap_number->value).ToLocalChecked());
+    break;
+  }
+  case InspectType::kJsArray: {
+    js_array_t* js_array = static_cast<js_array_t*>(inspect);
+    result->Set(Nan::New<String>("total_length").ToLocalChecked(),
+                Nan::New<Number>(js_array->total_length));
+    Local<Array> array = Nan::New<Array>(js_array->display_elemets->length);
+    for(int i = 0; i < js_array->display_elemets->length; ++i) {
+      array->Set(i, InspectJsObject(*(js_array->display_elemets->elements + i)));
+    }
+    result->Set(Nan::New<String>("display_array").ToLocalChecked(), array);
+    break;
+  }
+  case InspectType::kOddball: {
+    oddball_t* oddball = static_cast<oddball_t*>(inspect);
+    result->Set(Nan::New<String>("value").ToLocalChecked(),
+                Nan::New<String>(oddball->value).ToLocalChecked());
+    break;
+  }
+  case InspectType::kJsFunction: {
+    js_function_t* js_function = static_cast<js_function_t*>(inspect);
+    result->Set(Nan::New<String>("func_name").ToLocalChecked(),
+                Nan::New<String>(js_function->func_name).ToLocalChecked());
+    result->Set(Nan::New<String>("func_source").ToLocalChecked(),
+                Nan::New<String>(js_function->func_source).ToLocalChecked());
+    result->Set(Nan::New<String>("debug_line").ToLocalChecked(),
+                Nan::New<String>(js_function->debug_line).ToLocalChecked());
+    result->Set(Nan::New<String>("context_address").ToLocalChecked(),
+                Nan::New<String>(js_function->context_address).ToLocalChecked());
+    if(js_function->context != nullptr)
+      result->Set(Nan::New<String>("context").ToLocalChecked(),
+                  InspectJsObject(js_function->context));
+    break;
+  }
+  case InspectType::kJsRegExp: {
+    js_regexp_t* js_regexp = static_cast<js_regexp_t*>(inspect);
+    result->Set(Nan::New<String>("regexp").ToLocalChecked(),
+                Nan::New<String>(js_regexp->source).ToLocalChecked());
+    if(js_regexp->elements != nullptr) {
+      Local<Array> elements = Nan::New<Array>(js_regexp->elements->length);
+      for(int i = 0; i < js_regexp->elements->length; ++i) {
+        elements->Set(i, InspectJsObject(*(js_regexp->elements->elements + i)));
+      }
+      result->Set(Nan::New<String>("elements").ToLocalChecked(), elements);
+    }
+    if(js_regexp->properties != nullptr) {
+      Local<Object> properties = Nan::New<Object>();
+      properties_t* props = js_regexp->properties;
+      for(int i = 0; i < props->length; ++i) {
+        property_t* prop = *(props->properties + i);
+        // ignore hole
+        if(prop == nullptr) continue;
+        if(prop->value == nullptr)
+          properties->Set(Nan::New<String>(prop->key).ToLocalChecked(),
+                          Nan::New<String>(prop->value_str).ToLocalChecked());
+        else
+          properties->Set(Nan::New<String>(prop->key).ToLocalChecked(),
+                          InspectJsObject(prop->value));
+      }
+      result->Set(Nan::New<String>("properties").ToLocalChecked(), properties);
+    }
+    break;
+  }
+  case InspectType::kFirstNonstring: {
+    first_non_string_t* non_string = static_cast<first_non_string_t*>(inspect);
+    result->Set(Nan::New<String>("total_length").ToLocalChecked(),
+                Nan::New<Number>(non_string->total_length));
+    result->Set(Nan::New<String>("display").ToLocalChecked(),
+                Nan::New<String>(non_string->display_value).ToLocalChecked());
+    break;
+  }
+  case InspectType::kJsArrayBuffer: {
+    js_array_buffer_t* array_buffer = static_cast<js_array_buffer_t*>(inspect);
+    result->Set(Nan::New<String>("neutered").ToLocalChecked(),
+                Nan::New<Boolean>(array_buffer->neutered));
+    if(!array_buffer->neutered) {
+      result->Set(Nan::New<String>("byte_length").ToLocalChecked(),
+                  Nan::New<Number>(array_buffer->byte_length));
+      result->Set(Nan::New<String>("backing_store_address").ToLocalChecked(),
+                  Nan::New<String>(array_buffer->backing_store_address).ToLocalChecked());
+      if(array_buffer->elements != nullptr) {
+        Local<Array> elements = Nan::New<Array>(array_buffer->display_length);
+        for(int i = 0; i < array_buffer->display_length; ++i) {
+          elements->Set(i, Nan::New<String>(*(array_buffer->elements + i)).ToLocalChecked());
+        }
+        result->Set(Nan::New<String>("display_array").ToLocalChecked(), elements);
+      }
+    }
+    break;
+  }
+  case InspectType::kJsArrayBufferView: {
+    js_array_buffer_view_t* array_buffer_view = static_cast<js_array_buffer_view_t*>(inspect);
+    result->Set(Nan::New<String>("neutered").ToLocalChecked(),
+                Nan::New<Boolean>(array_buffer_view->neutered));
+    if(!array_buffer_view->neutered) {
+      result->Set(Nan::New<String>("byte_length").ToLocalChecked(),
+                  Nan::New<Number>(array_buffer_view->byte_length));
+      result->Set(Nan::New<String>("byte_offset").ToLocalChecked(),
+                  Nan::New<Number>(array_buffer_view->byte_offset));
+      result->Set(Nan::New<String>("backing_store_address").ToLocalChecked(),
+                  Nan::New<String>(array_buffer_view->backing_store_address).ToLocalChecked());
+      if(array_buffer_view->elements != nullptr) {
+        Local<Array> elements = Nan::New<Array>(array_buffer_view->display_length);
+        for(int i = 0; i < array_buffer_view->display_length; ++i) {
+          elements->Set(i, Nan::New<String>(*(array_buffer_view->elements + i)).ToLocalChecked());
+        }
+        result->Set(Nan::New<String>("display_array").ToLocalChecked(), elements);
+      }
+    }
+    break;
+  }
+  case InspectType::kJsDate: {
+    js_date_t* js_date = static_cast<js_date_t*>(inspect);
+    result->Set(Nan::New<String>("date").ToLocalChecked(),
+                Nan::New<String>(js_date->value).ToLocalChecked());
+    break;
+  }
+  default:
+    break;
+  }
+
+  return result;
 }
 
 void LLNode::LoadCore(const Nan::FunctionCallbackInfo<Value>& info) {
@@ -267,6 +483,19 @@ void LLNode::GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info) {
     result->Set(i - current, ins);
   }
   delete pagination;
+  info.GetReturnValue().Set(result);
+}
+
+void LLNode::InspectJsObjectAtAddress(const Nan::FunctionCallbackInfo<Value>& info) {
+  Nan::Utf8String address_str(info[0]);
+  if ((*address_str)[0] != '0' || (*address_str)[1] != 'x' ||
+      address_str.length() > 18) {
+    Nan::ThrowTypeError("Invalid address");
+    return;
+  }
+  LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
+  uint64_t addr = std::strtoull(*address_str, nullptr, 16);
+  Local<Object> result = llnode->InspectJsObject(llnode->api->Inspect(addr, true));
   info.GetReturnValue().Set(result);
 }
 }
