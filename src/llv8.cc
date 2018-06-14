@@ -552,6 +552,51 @@ std::string JSFunction::GetDebugLine(std::string args, Error& err) {
   return res;
 }
 
+js_function_debug_t* JSFunction::GetDebugLineX(Error& err) {
+  SharedFunctionInfo info = Info(err);
+  if (err.Fail()) return nullptr;
+
+  js_function_debug_t* js_function_debug = new js_function_debug_t;
+  js_function_debug->func_name = info.ProperName(err);
+  if (err.Fail()) {
+    delete js_function_debug;
+    return nullptr;
+  }
+
+  js_function_debug->line = info.GetPostfix(err);
+  if (err.Fail()) {
+    delete js_function_debug;
+    return nullptr;
+  }
+
+  // TODO: add arguments
+  // int64_t param_count = info.ParameterCount(err);
+  // if (err.Fail()) {
+  //   delete js_function_debug;
+  //   return nullptr;
+  // }
+
+  // Value receiver = GetReceiver(param_count, err);
+  // if (err.Fail()) {
+  //   delete js_function_debug;
+  //   return nullptr;
+  // }
+
+  // InspectOptions options;
+
+  // printf("context: %s\n", (receiver.InspectX(&options, err)->address).c_str());
+
+  // for (int64_t i = 0; i < param_count; i++) {
+  //   Value param = GetParam(i, param_count, err);
+  //   if (err.Fail()) return std::string();
+
+  //   res += ", " + param.Inspect(&options, err);
+  //   if (err.Fail()) return std::string();
+  // }
+
+  return js_function_debug;
+}
+
 void JSFunction::GetDebugLineX(valid_js_frame_t* vjft, Error& err) {
   SharedFunctionInfo info = Info(err);
   if (err.Fail()) return;
@@ -609,12 +654,14 @@ std::string JSFunction::Inspect(InspectOptions* options, Error& err) {
 js_function_t* JSFunction::InspectX(InspectOptions* options, Error& err) {
   js_function_t* js_function = new js_function_t;
   js_function->type = kJsFunction;
-  js_function->name = "function";
-  js_function->debug_line = GetDebugLine(std::string(), err);
+  js_function->name = "Function";
+  js_function_debug_t* debug_info = GetDebugLineX(err);
   if (err.Fail()) {
     delete js_function;
     return nullptr;
   }
+  js_function->func_name = debug_info->func_name;
+  js_function->debug_line = debug_info->line;
 
   if (options->detailed) {
     HeapObject context_obj = GetContext(err);
@@ -635,21 +682,8 @@ js_function_t* JSFunction::InspectX(InspectOptions* options, Error& err) {
     }
 
     if (options->print_source) {
-      SharedFunctionInfo info = Info(err);
-      if (err.Fail()) {
-        delete js_function;
-        return nullptr;
-      }
-
-      std::string name_str = info.ProperName(err);
-      if (err.Fail()) {
-        delete js_function;
-        return nullptr;
-      }
-
       std::string source = GetSource(err);
       if (!err.Fail()) {
-        js_function->func_name = name_str;
         js_function->func_source = source;
       }
     }
@@ -1265,7 +1299,7 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
 
   if (type == v8()->types()->kOddballType) {
     Oddball o(this);
-    odd_ball_t* oddball =  o.InspectX(err);
+    oddball_t* oddball =  o.InspectX(err);
     oddball->map_address = inspect->map_address;
     oddball->address = inspect->address;
     delete inspect;
@@ -1794,11 +1828,11 @@ std::string Oddball::Inspect(Error& err) {
   return "<Oddball>";
 }
 
-odd_ball_t* Oddball::InspectX(Error& err) {
+oddball_t* Oddball::InspectX(Error& err) {
   Smi kind = Kind(err);
   if (err.Fail()) return nullptr;
 
-  odd_ball_t* oddball = new odd_ball_t;
+  oddball_t* oddball = new oddball_t;
   oddball->type = kOddball;
   oddball->name = "Oddball";
   oddball->value = "";
@@ -1887,6 +1921,7 @@ js_array_buffer_t* JSArrayBuffer::InspectX(InspectOptions* options, Error& err) 
 
   if (options->detailed) {
     int display_length = std::min<int>(byte_length, options->length);
+    array_buffer->display_length = display_length;
     array_buffer->elements = v8()->LoadBytesX(data, display_length, err);
   } else {
     array_buffer->elements = nullptr;
@@ -2018,6 +2053,7 @@ js_array_buffer_view_t* JSArrayBufferView::InspectX(InspectOptions* options, Err
 
   if(options->detailed) {
     int display_length = std::min<int>(byte_length, options->length);
+    array_buffer_view->display_length = display_length;
     array_buffer_view->elements = v8()->LoadBytesX(data + byte_offset, display_length, err);
   } else {
     array_buffer_view->elements = nullptr;
@@ -2725,7 +2761,7 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
       Error::PrintInDebugMode("Unknown field Type %" PRId64,
                               details.GetValue());
       p->value = nullptr;
-      p->value_str = "Unknown field Type";
+      p->value_str = "unknown field type";
       property[i] = p;
       continue;
     }

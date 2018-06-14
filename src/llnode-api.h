@@ -44,6 +44,7 @@ public:
   uint32_t GetTypeTotalSize(size_t type_index);
   std::string** GetTypeInstances(size_t type_index);
   std::string GetObject(uint64_t address, bool detailed);
+  inspect_t* Inspect(uint64_t address, bool detailed);
 
 private:
   LLNode* llnode;

@@ -64,21 +64,20 @@ typedef struct {
   std::string map_address;
 } inspect_t;
 
-
 typedef struct {
   std::string key;
-  inspect_t* value;
+  inspect_t* value = nullptr;
   std::string value_str;
 } property_t;
 
 typedef struct {
   int length;
-  property_t** properties;
+  property_t** properties = nullptr;
 } properties_t;
 
 typedef struct {
   int length;
-  inspect_t** elements;
+  inspect_t** elements = nullptr;
 } elements_t;
 
 typedef struct {
@@ -87,9 +86,15 @@ typedef struct {
 
 typedef struct {
   int length;
-  internal_filed_t** internal_fileds;
+  internal_filed_t** internal_fileds = nullptr;
 } internal_fileds_t;
 
+typedef struct {
+  std::string func_name;
+  std::string line;
+  int args_length;
+  inspect_t** args = nullptr;
+} js_function_debug_t;
 
 typedef struct: inspect_t {
   std::string value;
@@ -101,19 +106,19 @@ typedef struct: inspect_t {
   int in_object_properties_or_constructor_index;
   int instance_size;
   std::string descriptors_address;
-  inspect_t* descriptors_array;
+  inspect_t* descriptors_array = nullptr;
 } map_t;
 
 typedef struct: inspect_t {
   int length;
-  inspect_t** content;
+  inspect_t** content = nullptr;
 } fixed_array_t;
 
 typedef struct: inspect_t {
   std::string constructor;
-  elements_t* elements;
-  properties_t* properties;
-  internal_fileds_t* fields;
+  elements_t* elements = nullptr;
+  properties_t* properties = nullptr;
+  internal_fileds_t* fields = nullptr;
 } js_object_t;
 
 typedef struct: inspect_t {
@@ -122,32 +127,32 @@ typedef struct: inspect_t {
 
 typedef struct: inspect_t {
   int total_length;
-  elements_t* display_elemets;
+  elements_t* display_elemets = nullptr;
 } js_array_t;
 
 typedef struct: inspect_t {
   std::string value;
-} odd_ball_t;
+} oddball_t;
 
 typedef struct: inspect_t {
-  std::string debug_line;
-  std::string context_address;
-  inspect_t* context;
   std::string func_name;
   std::string func_source;
+  std::string debug_line;
+  std::string context_address;
+  inspect_t* context = nullptr;
 } js_function_t;
 
 typedef struct: inspect_t {
   std::string previous_address;
   std::string closure_address;
-  inspect_t* closure;
-  properties_t* scope_object;
+  inspect_t* closure = nullptr;
+  properties_t* scope_object = nullptr;
 } context_t;
 
 typedef struct: inspect_t {
   std::string source;
-  elements_t* elements;
-  properties_t* properties;
+  elements_t* elements = nullptr;
+  properties_t* properties = nullptr;
 } js_regexp_t;
 
 typedef struct: inspect_t {
@@ -160,7 +165,8 @@ typedef struct: inspect_t {
   bool neutered;
   int byte_length;
   std::string backing_store_address;
-  std::string* elements;
+  int display_length;
+  std::string* elements = nullptr;
 } js_array_buffer_t;
 
 typedef struct: inspect_t {
@@ -169,7 +175,8 @@ typedef struct: inspect_t {
   int byte_length;
   int byte_offset;
   std::string backing_store_address;
-  std::string* elements;
+  int display_length;
+  std::string* elements = nullptr;
 } js_array_buffer_view_t;
 
 typedef struct: inspect_t {
