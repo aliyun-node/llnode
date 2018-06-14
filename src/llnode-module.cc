@@ -430,19 +430,9 @@ void LLNode::GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info) {
     return;
   }
   uint32_t type_count = llnode->api->GetHeapTypeCount();
-  uint32_t current = 0;
-  if(info[0]->IsNumber())
-    current = Nan::To<uint32_t>(info[0]).FromJust();
-  uint32_t limit = 0;
-  if(info[1]->IsNumber())
-    limit = Nan::To<uint32_t>(info[1]).FromJust();
-  else
-    limit = type_count;
-  if(current >= type_count)
-    current = type_count;
-  uint32_t end = current + limit;
-  if(end >= type_count)
-    end = type_count;
+  pagination_t<uint32_t>* pagination = GetPagination<uint32_t>(info[0], info[1], type_count);
+  uint32_t current = pagination->current;
+  uint32_t end = pagination->end;
   Local<Array> object_list = Nan::New<Array>(end - current);
   for(uint32_t i = current; i < end; ++i) {
     Local<Object> type = Nan::New<Object>();
@@ -452,6 +442,7 @@ void LLNode::GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info) {
     type->Set(Nan::New<String>("size").ToLocalChecked(), Nan::New<Number>(llnode->api->GetTypeTotalSize(i)));
     object_list->Set(i - current, type);
   }
+  delete pagination;
   info.GetReturnValue().Set(object_list);
 }
 void LLNode::GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info) {
