@@ -41,7 +41,9 @@ private:
   static void GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info);
   static void GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info);
   static void GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info);
+  static void InspectJsObjectAtAddress(const Nan::FunctionCallbackInfo<Value>& info);
   Local<Array> GetThreadInfoById(size_t thread_index, size_t curt, size_t limt);
+  Local<Object> InspectJsObject(inspect_t* inspect);
   bool ScanHeap();
 
   // core & executable
