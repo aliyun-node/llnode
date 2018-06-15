@@ -1720,6 +1720,8 @@ context_t* Context::InspectX(Error& err) {
   InspectOptions options;
 
   context_t* context = new context_t;
+  context->type = kContext;
+  context->name = "Context";
   HeapObject heap_previous = HeapObject(previous);
   if (heap_previous.Check()) {
     char tmp[128];
