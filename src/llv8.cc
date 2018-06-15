@@ -640,6 +640,7 @@ js_function_t* JSFunction::InspectX(InspectOptions* options, Error& err) {
   }
   js_function->func_name = debug_info->func_name;
   js_function->debug_line = debug_info->line;
+  delete debug_info;
 
   if (options->detailed) {
     HeapObject context_obj = GetContext(err);
@@ -784,14 +785,12 @@ inspect_t* JSRegExp::InspectX(InspectOptions* options, Error& err) {
     // add properties
     HeapObject map_obj = GetMap(err);
     if (err.Fail()) {
-      delete js_regexp->elements;
       delete js_regexp;
       return nullptr;
     }
     Map map(map_obj);
     bool is_dict = map.IsDictionary(err);
     if (err.Fail()) {
-      delete js_regexp->elements;
       delete js_regexp;
       return nullptr;
     }
@@ -800,7 +799,6 @@ inspect_t* JSRegExp::InspectX(InspectOptions* options, Error& err) {
     else
       js_regexp->properties = InspectDescriptorsX(map, err);
     if (err.Fail()) {
-      delete js_regexp->elements;
       delete js_regexp;
       return nullptr;
     }
@@ -1625,13 +1623,11 @@ fixed_array_t* FixedArray::InspectX(InspectOptions* options, Error& err) {
     for (int i = 0; i < fixed_array->length; ++i) {
       Value value = Get<Value>(i, err);
       if (err.Fail()) {
-        delete fixed_array->elements;
         delete fixed_array;
         return nullptr;
       }
       fixed_array->elements[i] = value.InspectX(&opt, err);
       if (err.Fail()) {
-        delete fixed_array->elements;
         delete fixed_array;
         return nullptr;
       }
@@ -1793,46 +1789,34 @@ context_t* Context::InspectX(Error& err) {
   property_t** object_list = new property_t*[local_count];
   scope_object->length = local_count;
   scope_object->properties = object_list;
+  context->scope_object = scope_object;
   for (int i = 0; i < local_count; i++) {
     String name = scope.ContextLocalName(i, param_count, stack_count, err);
     if (err.Fail()) {
-      delete[] object_list;
-      delete scope_object;
       delete context;
       return nullptr;
     }
 
     property_t* object = new property_t;
+    object_list[i] = object;
     object->key =  name.ToString(err);
     if (err.Fail()) {
-      delete object;
-      delete[] object_list;
-      delete scope_object;
       delete context;
       return nullptr;
     }
 
     Value value = ContextSlot(i, err);
     if (err.Fail()) {
-      delete object;
-      delete[] object_list;
-      delete scope_object;
       delete context;
       return nullptr;
     }
 
     object->value = value.InspectX(&options, err);
     if (err.Fail()) {
-      delete object;
-      delete[] object_list;
-      delete scope_object;
       delete context;
       return nullptr;
     }
-    object_list[i] = object;
   }
-
-  context->scope_object = scope_object;
   return context;
 }
 
@@ -2259,14 +2243,12 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
     // add properties
     HeapObject map_obj = GetMap(err);
     if (err.Fail()) {
-      delete js_object->elements;
       delete js_object;
       return nullptr;
     }
     Map map(map_obj);
     bool is_dict = map.IsDictionary(err);
     if (err.Fail()) {
-      delete js_object->elements;
       delete js_object;
       return nullptr;
     }
@@ -2275,7 +2257,6 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
     else
       js_object->properties = InspectDescriptorsX(map, err);
     if (err.Fail()) {
-      delete js_object->elements;
       delete js_object;
       return nullptr;
     }
@@ -2283,8 +2264,6 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
     // add internal fields
     js_object->fields = InspectInternalFieldsX(err);
     if (err.Fail()) {
-      delete js_object->elements;
-      delete js_object->properties;
       delete js_object;
       return nullptr;
     }
@@ -2370,7 +2349,6 @@ internal_fileds_t* JSObject::InspectInternalFieldsX(Error& err) {
        off < instance_size; off += v8()->common()->kPointerSize) {
     int64_t field = LoadField(off, err);
     if (err.Fail()) {
-      delete[] fieldtmp;
       delete fields;
       return nullptr;
     }
@@ -2492,7 +2470,6 @@ elements_t* JSObject::InspectElementsX(int64_t length, Error& err) {
   for (int64_t i = 0; i < length; i++) {
     Value value = elements.Get<Value>(i, err);
     if (err.Fail()) {
-      delete[] element;
       delete elementstmp;
       return nullptr;
     }
@@ -2500,7 +2477,6 @@ elements_t* JSObject::InspectElementsX(int64_t length, Error& err) {
     bool is_hole = value.IsHole(err);
 
     if (err.Fail()) {
-      delete[] element;
       delete elementstmp;
       return nullptr;
     }
@@ -2512,7 +2488,6 @@ elements_t* JSObject::InspectElementsX(int64_t length, Error& err) {
 
     element[i] = value.InspectX(&options, err);
     if (err.Fail()) {
-      delete[] element;
       delete elementstmp;
       return nullptr;
     }
@@ -2575,7 +2550,6 @@ properties_t* JSObject::InspectDictionaryX(Error& err) {
   for (int64_t i = 0; i < length; i++) {
     Value key = dictionary.GetKey(i, err);
     if (err.Fail()) {
-      delete[] property;
       delete properties;
       return nullptr;
     }
@@ -2584,7 +2558,6 @@ properties_t* JSObject::InspectDictionaryX(Error& err) {
     bool is_hole = key.IsHoleOrUndefined(err);
 
     if (err.Fail()) {
-      delete[] property;
       delete properties;
       return nullptr;
     }
@@ -2596,28 +2569,23 @@ properties_t* JSObject::InspectDictionaryX(Error& err) {
 
     Value value = dictionary.GetValue(i, err);
     if (err.Fail()) {
-      delete[] property;
       delete properties;
       return nullptr;
     }
 
     property_t* p = new property_t;
+    property[i] = p;
     p->key = key.ToString(err);
     if (err.Fail()) {
-      delete p;
-      delete[] property;
       delete properties;
       return nullptr;
     }
 
     p->value = value.InspectX(&options, err);
     if (err.Fail()) {
-      delete p;
-      delete[] property;
       delete properties;
       return nullptr;
     }
-    property[i] = p;
   }
 
   return properties;
@@ -2736,24 +2704,20 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
   for (int64_t i = 0; i < own_descriptors_count; i++) {
     Smi details = descriptors.GetDetails(i, err);
     if (err.Fail()) {
-      delete[] property;
       delete properties;
       return nullptr;
     }
 
     Value key = descriptors.GetKey(i, err);
     if (err.Fail()) {
-      delete[] property;
       delete properties;
       return nullptr;
     }
 
     property_t* p = new property_t;
-
+    property[i] = p;
     p->key = key.ToString(err);
     if (err.Fail()) {
-      delete p;
-      delete[] property;
       delete properties;
       return nullptr;
     }
@@ -2763,20 +2727,15 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
 
       value = descriptors.GetValue(i, err);
       if (err.Fail()) {
-        delete p;
-        delete[] property;
         delete properties;
         return nullptr;
       }
 
       p->value = value.InspectX(&options, err);
       if (err.Fail()) {
-        delete p;
-        delete[] property;
         delete properties;
         return nullptr;
       }
-      property[i] = p;
       continue;
     }
 
@@ -2786,7 +2745,6 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
                               details.GetValue());
       p->value = nullptr;
       p->value_str = "unknown field type";
-      property[i] = p;
       continue;
     }
 
@@ -2800,8 +2758,6 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
         value = extra_properties.Get<double>(index, err);
 
       if (err.Fail()) {
-        delete p;
-        delete[] property;
         delete properties;
         return nullptr;
       }
@@ -2818,8 +2774,6 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
         value = extra_properties.Get<Value>(index, err);
 
       if (err.Fail()) {
-        delete p;
-        delete[] property;
         delete properties;
         return nullptr;
       }
@@ -2827,12 +2781,9 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
       p->value = value.InspectX(&options, err);
     }
     if (err.Fail()) {
-      delete p;
-      delete[] property;
       delete properties;
       return nullptr;
     }
-    property[i] = p;
   }
 
   return properties;;
