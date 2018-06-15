@@ -118,9 +118,8 @@ uint32_t LLNodeApi::GetFrameCountByThreadId(size_t thread_index) {
 
 frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
   long long key = (static_cast<long long>(thread_index) << 32) + frame_index;
-  if(frame_map.count(key) != 0) {
+  if(frame_map.count(key) != 0)
     return frame_map.at(key);
-  }
   SBThread thread = process->GetThreadAtIndex(thread_index);
   SBFrame frame = thread.GetFrameAtIndex(frame_index);
   SBSymbol symbol = frame.GetSymbol();
@@ -215,9 +214,8 @@ uint32_t LLNodeApi::GetTypeTotalSize(size_t type_index) {
 }
 
 string** LLNodeApi::GetTypeInstances(size_t type_index) {
-  if(instances_map.count(type_index) != 0) {
+  if(instances_map.count(type_index) != 0)
     return instances_map.at(type_index);
-  }
   if (object_types.size() <= type_index) {
     return nullptr;
   }
@@ -252,6 +250,8 @@ std::string LLNodeApi::GetObject(uint64_t address, bool detailed) {
 }
 
 inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
+  if(inspect_map.count(address) != 0)
+    return inspect_map.at(address);
   v8::Value v8_value(llscan->v8(), address);
   v8::Value::InspectOptions inspect_options;
   inspect_options.detailed = detailed;
@@ -263,6 +263,7 @@ inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
   v8::Error err;
   inspect_t* result = v8_value.InspectX(&inspect_options, err);
   if (err.Fail() || result == nullptr) return nullptr;
+  inspect_map.insert(InspectMap::value_type(address, result));
   return result;
 }
 }
