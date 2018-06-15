@@ -125,49 +125,48 @@ frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
   SBFrame frame = thread.GetFrameAtIndex(frame_index);
   SBSymbol symbol = frame.GetSymbol();
   std::string result;
-  frame_t* ft = new frame_t;
   if (symbol.IsValid()) {
-    ft->type = 1;
-    ft->native_frame = new native_frame_t;
-    ft->native_frame->symbol = "Native";
-    ft->native_frame->function =
+    native_frame_t* nft = new native_frame_t;
+    nft->type = kNativeFrame;
+    nft->name = "Native";
+    nft->function =
       static_cast<std::string>(frame.GetFunctionName());
     lldb::SBModule module = frame.GetModule();
     lldb::SBFileSpec moduleFileSpec = module.GetFileSpec();
-    ft->native_frame->module_file =
+    nft->module_file =
       static_cast<std::string>(moduleFileSpec.GetDirectory()) + "/" +
       static_cast<std::string>(moduleFileSpec.GetFilename());
     lldb::SBCompileUnit compileUnit = frame.GetCompileUnit();
     lldb::SBFileSpec compileUnitFileSpec = compileUnit.GetFileSpec();
     if (compileUnitFileSpec.GetDirectory() != nullptr ||
         compileUnitFileSpec.GetFilename() != nullptr) {
-      ft->native_frame->compile_unit_file =
+      nft->compile_unit_file =
         static_cast<std::string>(compileUnitFileSpec.GetDirectory()) + "/" +
         static_cast<std::string>(compileUnitFileSpec.GetFilename());
     }
+    frame_map.insert(FrameMap::value_type(key, nft));
+    return nft;
   } else {
-    ft->type = 2;
     // V8 frame
     v8::Error err;
     v8::JSFrame v8_frame(llscan->v8(),
                          static_cast<int64_t>(frame.GetFP()));
-    ft->js_frame = new js_frame_t;
-    v8_frame.InspectX(true, ft->js_frame, err);
-    bool invalid = ft->js_frame->type == 1;
-    if (err.Fail() || (invalid && strlen(ft->js_frame->invalid_js_frame) == 0)
-        || (invalid && ft->js_frame->invalid_js_frame[0] == '<')) {
-      if (invalid && ft->js_frame->invalid_js_frame[0] == '<') {
-        ft->js_frame->symbol = "Unknown";
+    js_frame_t* jft = v8_frame.InspectX(true, err);
+    jft->type = kJsFrame;
+    if (err.Fail() || jft->function.length() == 0 || jft->function[0] == '<') {
+      if (jft->function[0] == '<') {
+        jft->name = "Unknown";
       } else {
-        ft->js_frame->invalid_js_frame = "???";
+        jft->name = "???";
+        jft->function = "???";
       }
     } else {
       // V8 symbol
-      ft->js_frame->symbol = "JavaScript";
+      jft->name = "JavaScript";
     }
+    frame_map.insert(FrameMap::value_type(key, jft));
+    return jft;
   }
-  frame_map.insert(FrameMap::value_type(key, ft));
-  return ft;
 }
 
 bool LLNodeApi::ScanHeap() {
@@ -257,6 +256,8 @@ inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
   inspect_options.detailed = detailed;
   inspect_options.length = 100;
   inspect_options.start_address = address;
+  // TDOD: search function source
+  // inspect_options.print_source = true;
 
   v8::Error err;
   inspect_t* result = v8_value.InspectX(&inspect_options, err);
