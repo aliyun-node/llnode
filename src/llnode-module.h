@@ -24,6 +24,8 @@ struct pagination_t {
 };
 template <typename T>
 pagination_t<T>* GetPagination(Local<Value> in_curt, Local<Value> in_limt, T length);
+template <typename T>
+Local<Array> GetDisPlayElements(T* eles);
 
 class LLNode : public Nan::ObjectWrap {
 public:
@@ -44,6 +46,9 @@ private:
   static void InspectJsObjectAtAddress(const Nan::FunctionCallbackInfo<Value>& info);
   Local<Object> GetThreadInfoById(size_t thread_index, size_t curt, size_t limt);
   Local<Object> InspectJsObject(inspect_t* inspect);
+  Local<Object> GetProperties(properties_t* props);
+  Local<Array> GetElements(elements_t* eles);
+  Local<Array> GetInternalFields(internal_fileds_t* fields);
   bool ScanHeap();
 
   // core & executable

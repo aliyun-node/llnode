@@ -152,6 +152,7 @@ frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
     v8::JSFrame v8_frame(llscan->v8(),
                          static_cast<int64_t>(frame.GetFP()));
     js_frame_t* jft = v8_frame.InspectX(true, err);
+    if(jft == nullptr) return nullptr;
     jft->type = kJsFrame;
     if (err.Fail() || jft->function.length() == 0 || jft->function[0] == '<') {
       if (jft->function[0] == '<') {
@@ -261,7 +262,7 @@ inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
 
   v8::Error err;
   inspect_t* result = v8_value.InspectX(&inspect_options, err);
-  if (err.Fail()) return nullptr;
+  if (err.Fail() || result == nullptr) return nullptr;
   return result;
 }
 }

@@ -1251,6 +1251,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (JSObject::IsObjectType(v8(), type)) {
     JSObject o(this);
     js_object_t* js_object = o.InspectX(options, err);
+    if(js_object == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     js_object->map_address = inspect->map_address;
     js_object->address = inspect->address;
     delete inspect;
@@ -1260,6 +1264,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kHeapNumberType) {
     HeapNumber n(this);
     heap_number_t* heap_number =  n.InspectX(err);
+    if(heap_number == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     heap_number->map_address = inspect->map_address;
     heap_number->address = inspect->address;
     delete inspect;
@@ -1269,6 +1277,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSArrayType) {
     JSArray arr(this);
     js_array_t* js_array = arr.InspectX(options, err);
+    if(js_array == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     js_array->map_address = inspect->map_address;
     js_array->address = inspect->address;
     delete inspect;
@@ -1278,6 +1290,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kOddballType) {
     Oddball o(this);
     oddball_t* oddball =  o.InspectX(err);
+    if(oddball == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     oddball->map_address = inspect->map_address;
     oddball->address = inspect->address;
     delete inspect;
@@ -1287,6 +1303,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSFunctionType) {
     JSFunction fn(this);
     js_function_t* js_function =  fn.InspectX(options, err);
+    if(js_function == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     js_function->map_address = inspect->map_address;
     js_function->address = inspect->address;
     delete inspect;
@@ -1296,6 +1316,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSRegExpType) {
     JSRegExp re(this);
     inspect_t* js_regexp = re.InspectX(options, err);
+    if(js_regexp == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     js_regexp->map_address = inspect->map_address;
     js_regexp->address = inspect->address;
     delete inspect;
@@ -1305,6 +1329,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type < v8()->types()->kFirstNonstringType) {
     String str(this);
     first_non_string_t* string = str.InspectX(options, err);
+    if(string == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     string->map_address = inspect->map_address;
     string->address = inspect->address;
     delete inspect;
@@ -1314,6 +1342,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kFixedArrayType) {
     FixedArray arr(this);
     fixed_array_t* fixed_array = arr.InspectX(options, err);
+    if(fixed_array == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     fixed_array->map_address = inspect->map_address;
     fixed_array->address = inspect->address;
     delete inspect;
@@ -1323,6 +1355,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSArrayBufferType) {
     JSArrayBuffer buf(this);
     js_array_buffer_t* array_buffer = buf.InspectX(options, err);
+    if(array_buffer == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     array_buffer->map_address = inspect->map_address;
     array_buffer->address = inspect->address;
     delete inspect;
@@ -1332,6 +1368,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSTypedArrayType) {
     JSArrayBufferView view(this);
     js_array_buffer_view_t* array_buffer_view = view.InspectX(options, err);
+    if(array_buffer_view == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     array_buffer_view->map_address = inspect->map_address;
     array_buffer_view->address = inspect->address;
     delete inspect;
@@ -1341,6 +1381,10 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSDateType) {
     JSDate date(this);
     js_date_t* js_date = date.InspectX(err);
+    if(js_date == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
     js_date->map_address = inspect->map_address;
     js_date->address = inspect->address;
     delete inspect;
@@ -1576,24 +1620,24 @@ fixed_array_t* FixedArray::InspectX(InspectOptions* options, Error& err) {
   fixed_array->name = "FixedArray";
   fixed_array->length = length_smi.GetValue();
   if (options->detailed) {
-    fixed_array->content = new inspect_t*[fixed_array->length];
+    fixed_array->elements = new inspect_t*[fixed_array->length];
     InspectOptions opt;
     for (int i = 0; i < fixed_array->length; ++i) {
       Value value = Get<Value>(i, err);
       if (err.Fail()) {
-        delete fixed_array->content;
+        delete fixed_array->elements;
         delete fixed_array;
         return nullptr;
       }
-      fixed_array->content[i] = value.InspectX(&opt, err);
+      fixed_array->elements[i] = value.InspectX(&opt, err);
       if (err.Fail()) {
-        delete fixed_array->content;
+        delete fixed_array->elements;
         delete fixed_array;
         return nullptr;
       }
     }
   } else {
-    fixed_array->content = nullptr;
+    fixed_array->elements = nullptr;
   }
 
   return fixed_array;
