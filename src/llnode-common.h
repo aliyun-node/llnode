@@ -22,6 +22,7 @@ enum InspectType {
   kJsArrayBuffer,
   kJsArrayBufferView,
   kJsDate,
+  kContext,
   kUnknown
 };
 

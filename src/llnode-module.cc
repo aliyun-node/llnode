@@ -377,6 +377,32 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
                 Nan::New<String>(js_date->value).ToLocalChecked());
     break;
   }
+  case InspectType::kContext: {
+    context_t* context = static_cast<context_t*>(inspect);
+    result->Set(Nan::New<String>("previous_address").ToLocalChecked(),
+                Nan::New<String>(context->previous_address).ToLocalChecked());
+    result->Set(Nan::New<String>("closure_address").ToLocalChecked(),
+                Nan::New<String>(context->closure_address).ToLocalChecked());
+    if(context->closure != nullptr)
+      result->Set(Nan::New<String>("closure").ToLocalChecked(), InspectJsObject(context->closure));
+    if(context->scope_object != nullptr) {
+      Local<Object> scope_object = Nan::New<Object>();
+      properties_t* props = context->scope_object;
+      for(int i = 0; i < props->length; ++i) {
+        property_t* prop = *(props->properties + i);
+        // ignore hole
+        if(prop == nullptr) continue;
+        if(prop->value == nullptr)
+          scope_object->Set(Nan::New<String>(prop->key).ToLocalChecked(),
+                            Nan::New<String>(prop->value_str).ToLocalChecked());
+        else
+          scope_object->Set(Nan::New<String>(prop->key).ToLocalChecked(),
+                            InspectJsObject(prop->value));
+      }
+      result->Set(Nan::New<String>("scope_object").ToLocalChecked(), scope_object);
+    }
+    break;
+  }
   default:
     break;
   }
