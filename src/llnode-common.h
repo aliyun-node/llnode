@@ -122,9 +122,7 @@ typedef struct: inspect_t {
   inspect_t* descriptors_array = nullptr;
 } map_t;
 
-typedef struct: inspect_t {
-  int length;
-  inspect_t** content = nullptr;
+typedef struct : elements_t, inspect_t {
 } fixed_array_t;
 
 typedef struct: inspect_t {
