@@ -93,5 +93,41 @@
         ]
       }]
     ]
+  }, {
+    "target_name": "addon",
+    "type": "loadable_module",
+    "include_dirs": [
+      "<!(node -e \"require('nan')\")"
+    ],
+    "sources": [
+      "src/addon.cc",
+      "src/llnode_module.cc",
+      "src/llnode_api.cc",
+      "src/llv8.cc",
+      "src/llv8-constants.cc",
+      "src/llscan.cc"
+    ],
+    "conditions": [
+      [ "OS=='linux' or OS=='freebsd'", {
+        "conditions": [
+          # If we could not locate the lib dir, then we will have to search
+          # from the global search paths during linking and at runtime
+          [ "lldb_lib_dir != ''", {
+            "ldflags": [
+              "-L<(lldb_lib_dir)",
+              "-Wl,-rpath,<(lldb_lib_dir)"
+            ]
+          }],
+          # If we cannot find a non-versioned library liblldb(-x.y).so,
+          # then we will have to link to the versioned library
+          # liblldb(-x.y).so.z loaded by the detected lldb executable
+          [ "lldb_lib_so != ''", {
+            "libraries": ["<(lldb_lib_so)"]
+          }, {
+            "libraries": ["-l<(lldb_lib)"]
+          }]
+        ]
+      }]
+    ]
   }],
 }
