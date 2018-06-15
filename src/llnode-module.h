@@ -46,7 +46,7 @@ private:
   static void InspectJsObjectAtAddress(const Nan::FunctionCallbackInfo<Value>& info);
   Local<Object> GetThreadInfoById(size_t thread_index, size_t curt, size_t limt);
   Local<Object> InspectJsObject(inspect_t* inspect);
-  Local<Object> GetProperties(properties_t* props);
+  Local<Array> GetProperties(properties_t* props);
   Local<Array> GetElements(elements_t* eles);
   Local<Array> GetInternalFields(internal_fileds_t* fields);
   bool ScanHeap();
