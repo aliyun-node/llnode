@@ -121,27 +121,42 @@ Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t
   for(size_t frame_index = current; frame_index < end; ++frame_index) {
     Local<Object> frame = Nan::New<Object>();
     frame_t* ft = api->GetFrameInfo(thread_index, frame_index);
-    if(ft->type == 1) {
-      native_frame_t* nft = ft->native_frame;
-      frame->Set(Nan::New<String>("symbol").ToLocalChecked(), Nan::New<String>(nft->symbol).ToLocalChecked());
-      frame->Set(Nan::New<String>("function").ToLocalChecked(), Nan::New<String>(nft->function).ToLocalChecked());
-      frame->Set(Nan::New<String>("module").ToLocalChecked(), Nan::New<String>(nft->module_file).ToLocalChecked());
-      frame->Set(Nan::New<String>("compile_unit").ToLocalChecked(), Nan::New<String>(nft->compile_unit_file).ToLocalChecked());
+    frame->Set(Nan::New<String>("type").ToLocalChecked(),
+               Nan::New<Number>(ft->type));
+    frame->Set(Nan::New<String>("name").ToLocalChecked(),
+               Nan::New<String>(ft->name).ToLocalChecked());
+    frame->Set(Nan::New<String>("function").ToLocalChecked(),
+               Nan::New<String>(ft->function).ToLocalChecked());
+    if(ft->type == FrameType::kNativeFrame) {
+      native_frame_t* nft = static_cast<native_frame_t*>(ft);
+      frame->Set(Nan::New<String>("module").ToLocalChecked(),
+                 Nan::New<String>(nft->module_file).ToLocalChecked());
+      frame->Set(Nan::New<String>("compile_unit").ToLocalChecked(),
+                 Nan::New<String>(nft->compile_unit_file).ToLocalChecked());
     }
-    if(ft->type == 2) {
-      js_frame_t* jft = ft->js_frame;
-      frame->Set(Nan::New<String>("symbol").ToLocalChecked(), Nan::New<String>(jft->symbol).ToLocalChecked());
-      if(jft->type == 1) {
-        std::string invalid_js_frame = jft->invalid_js_frame;
-        frame->Set(Nan::New<String>("name").ToLocalChecked(), Nan::New<String>(invalid_js_frame).ToLocalChecked());
+    if(ft->type == FrameType::kJsFrame) {
+      js_frame_t* jft = static_cast<js_frame_t*>(ft);
+      if(jft->args != nullptr) {
+        if(jft->args->context != nullptr)
+          frame->Set(Nan::New<String>("context").ToLocalChecked(), InspectJsObject(jft->args->context));
+        if(jft->args->args_list != nullptr) {
+          Local<Array> args_list = Nan::New<Array>(jft->args->length);
+          for(int i = 0; i < jft->args->length; ++i) {
+            if(jft->args->args_list[i] != nullptr)
+              args_list->Set(i, InspectJsObject(jft->args->args_list[i]));
+            else
+              args_list->Set(i, Nan::Null());
+          }
+          frame->Set(Nan::New<String>("arguments").ToLocalChecked(), args_list);
+        }
       }
-      if(jft->type == 2) {
-        frame->Set(Nan::New<String>("function").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->function).ToLocalChecked());
-        frame->Set(Nan::New<String>("context").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->context).ToLocalChecked());
-        frame->Set(Nan::New<String>("arguments").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->arguments).ToLocalChecked());
-        frame->Set(Nan::New<String>("line").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->line).ToLocalChecked());
-        frame->Set(Nan::New<String>("func_addr").ToLocalChecked(), Nan::New<String>(jft->valid_js_frame->address).ToLocalChecked());
-      }
+      if(jft->debug != nullptr)
+        frame->Set(
+          Nan::New<String>("line").ToLocalChecked(),
+          Nan::New<String>(jft->debug->line).ToLocalChecked());
+      frame->Set(
+        Nan::New<String>("func_addr").ToLocalChecked(),
+        Nan::New<String>(jft->address).ToLocalChecked());
     }
     frame_list->Set(frame_index - current, frame);
   }

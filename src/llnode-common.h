@@ -4,40 +4,8 @@
 #include <string>
 
 namespace llnode {
-typedef struct {
-  std::string symbol;
-  std::string function;
-  std::string module_file;
-  std::string compile_unit_file;
-} native_frame_t;
-
-typedef struct {
-  std::string function;
-  std::string context;
-  std::string arguments;
-  std::string line;
-  std::string address;
-} valid_js_frame_t;
-
-typedef struct {
-  int type;
-  std::string symbol;
-  union {
-    const char* invalid_js_frame;
-    valid_js_frame_t* valid_js_frame;
-  };
-} js_frame_t;
-
-typedef struct {
-  int type;
-  union {
-    native_frame_t* native_frame;
-    js_frame_t* js_frame;
-  };
-} frame_t;
-
 enum InspectType {
-  kNoObjectSmi,
+  kNoObjectSmi = 1,
   kSmi,
   kGlobalObject,
   kGlobalProxy,
@@ -57,12 +25,63 @@ enum InspectType {
   kUnknown
 };
 
+enum FrameType {
+  kNativeFrame = 1,
+  kJsFrame
+};
+
 typedef struct {
   InspectType type;
   std::string name;
   std::string address;
   std::string map_address;
 } inspect_t;
+
+typedef struct {
+  FrameType type;
+  std::string name;
+  std::string function;
+} frame_t;
+
+typedef struct Args {
+  int length;
+  inspect_t* context = nullptr;
+  inspect_t** args_list = nullptr;
+  ~Args() {
+    this->length = 0;
+    delete this->context;
+    this->context = nullptr;
+    delete[] this->args_list;
+    this->args_list = nullptr;
+  }
+} args_t;
+
+typedef struct JSFunctionDebug {
+  std::string func_name;
+  std::string line;
+  ~JSFunctionDebug() {
+    this->func_name = "";
+    this->line = "";
+  }
+} js_function_debug_t;
+
+typedef struct: frame_t {
+  std::string module_file;
+  std::string compile_unit_file;
+} native_frame_t;
+
+typedef struct JSFrame: frame_t {
+  args_t* args = nullptr;
+  js_function_debug_t* debug = nullptr;
+  std::string address;
+  ~JSFrame() {
+    delete this->args;
+    this->args = nullptr;
+    delete this->debug;
+    this->debug = nullptr;
+    this->address = "";
+  }
+} js_frame_t;
 
 typedef struct {
   std::string key;
@@ -88,13 +107,6 @@ typedef struct {
   int length;
   internal_filed_t** internal_fileds = nullptr;
 } internal_fileds_t;
-
-typedef struct {
-  std::string func_name;
-  std::string line;
-  int args_length;
-  inspect_t** args = nullptr;
-} js_function_debug_t;
 
 typedef struct: inspect_t {
   std::string value;
