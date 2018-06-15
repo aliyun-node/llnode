@@ -186,22 +186,25 @@ Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t
   return result;
 }
 
-Local<Object> LLNode::GetProperties(properties_t* props) {
-  Local<Object> properties = Nan::New<Object>();
+Local<Array> LLNode::GetProperties(properties_t* props) {
   if(props->properties != nullptr) {
+    Local<Array> properties = Nan::New<Array>(props->length);
     for(int i = 0; i < props->length; ++i) {
+      Local<Object> tmp = Nan::New<Object>();
       property_t* prop = *(props->properties + i);
       // ignore hole
       if(prop == nullptr) continue;
       if(prop->value == nullptr)
-        properties->Set(Nan::New<String>(prop->key).ToLocalChecked(),
-                        Nan::New<String>(prop->value_str).ToLocalChecked());
+        tmp->Set(Nan::New<String>(prop->key).ToLocalChecked(),
+                 Nan::New<String>(prop->value_str).ToLocalChecked());
       else
-        properties->Set(Nan::New<String>(prop->key).ToLocalChecked(),
-                        InspectJsObject(prop->value));
+        tmp->Set(Nan::New<String>(prop->key).ToLocalChecked(),
+                 InspectJsObject(prop->value));
+      properties->Set(i, tmp);
     }
-  }
-  return properties;
+    return properties;
+  } else
+    return Nan::New<Array>(0);
 }
 
 Local<Array> LLNode::GetElements(elements_t* eles) {
