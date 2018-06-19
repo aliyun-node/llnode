@@ -6,9 +6,6 @@
   "directories": {
     "test": "test"
   },
-  "bin": {
-    "llnode": "llnode.js"
-  },
   "scripts": {
     "preinstall": "node scripts/configure.js",
     "install": "node scripts/install.js",
