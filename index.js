@@ -1,6 +1,5 @@
 'use strict';
 
-const llnodex = require('bindings')('llnodex');
-const loadCore = llnodex.loadCore;
+const LLNode = require('bindings')('llnodex').LLNode;
 
-exports = module.exports = llnodex;
+exports = module.exports = LLNode;
