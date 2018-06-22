@@ -151,6 +151,21 @@ frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
     v8::JSFrame v8_frame(llscan->v8(),
                          static_cast<int64_t>(frame.GetFP()));
     js_frame_t* jft = v8_frame.InspectX(true, err);
+#ifdef LLDB_SBMemoryRegionInfoList_h_
+    {
+      if(jft == nullptr || jft->function.length() == 0) {
+        lldb::SBMemoryRegionInfo info;
+        const uint64_t pc = frame.GetPC();
+        if (target->GetProcess().GetMemoryRegionInfo(pc, info).Success() &&
+            info.IsExecutable() && info.IsWritable()) {
+          if(jft == nullptr) {
+            jft = new js_frame_t;
+          }
+          jft->function = "<builtin>";
+        }
+      }
+    }
+#endif
     if(jft == nullptr) return nullptr;
     jft->type = kJsFrame;
     if (err.Fail() || jft->function.length() == 0 || jft->function[0] == '<') {
