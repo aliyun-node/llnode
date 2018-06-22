@@ -137,6 +137,8 @@ Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t
       frame_list->Set(frame_index - current, frame);
       continue;
     }
+    frame->Set(Nan::New<String>("frame_index").ToLocalChecked(),
+               Nan::New<Number>(frame_index));
     frame->Set(Nan::New<String>("type").ToLocalChecked(),
                Nan::New<Number>(ft->type));
     frame->Set(Nan::New<String>("name").ToLocalChecked(),
