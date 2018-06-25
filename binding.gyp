@@ -81,7 +81,10 @@
       "src/llnode.cc",
       "src/llv8.cc",
       "src/llv8-constants.cc",
-      "src/llscan.cc"
+      "src/llscan.cc",
+      "src/error.cc",
+      "src/constants.cc",
+      "src/node-constants"
     ],
     "conditions": [
       [ "OS=='linux' or OS=='freebsd'", {

@@ -14,6 +14,7 @@
 #include "src/llnode-api.h"
 #include "src/llscan.h"
 #include "src/llv8.h"
+#include "src/error.h"
 
 namespace llnode {
 using std::set;
@@ -147,7 +148,7 @@ frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
     return nft;
   } else {
     // V8 frame
-    v8::Error err;
+    Error err;
     v8::JSFrame v8_frame(llscan->v8(),
                          static_cast<int64_t>(frame.GetFP()));
     js_frame_t* jft = v8_frame.InspectX(true, err);
@@ -256,7 +257,7 @@ std::string LLNodeApi::GetObject(uint64_t address, bool detailed) {
   inspect_options.length = 100;
   inspect_options.start_address = address;
 
-  v8::Error err;
+  Error err;
   std::string result = v8_value.Inspect(&inspect_options, err);
   if (err.Fail()) {
     return "Failed to get object";
@@ -275,7 +276,7 @@ inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
   // TDOD: search function source
   // inspect_options.print_source = true;
 
-  v8::Error err;
+  Error err;
   inspect_t* result = v8_value.InspectX(&inspect_options, err);
   if (err.Fail() || result == nullptr) return nullptr;
   inspect_map.insert(InspectMap::value_type(address, result));
