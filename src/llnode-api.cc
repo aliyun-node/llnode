@@ -266,8 +266,9 @@ std::string LLNodeApi::GetObject(uint64_t address, bool detailed) {
 }
 
 inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
-  if(inspect_map.count(address) != 0)
-    return inspect_map.at(address);
+  std::string key = std::to_string(address) + std::to_string(detailed);
+  if(inspect_map.count(key) != 0)
+    return inspect_map.at(key);
   v8::Value v8_value(llscan->v8(), address);
   v8::Value::InspectOptions inspect_options;
   inspect_options.detailed = detailed;
@@ -279,7 +280,7 @@ inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
   Error err;
   inspect_t* result = v8_value.InspectX(&inspect_options, err);
   if (err.Fail() || result == nullptr) return nullptr;
-  inspect_map.insert(InspectMap::value_type(address, result));
+  inspect_map.insert(InspectMap::value_type(key, result));
   return result;
 }
 }

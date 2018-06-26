@@ -94,6 +94,7 @@ class LLNode {
   getJsObjects() {}
 
   /**
+   * @param {number} index js instance index
    * @param {<optional>number} current current js instance index
    * @param {<optional>number} limit limit of js instances you want to get (start from current)
    *

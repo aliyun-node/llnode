@@ -525,13 +525,17 @@ void LLNode::GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info) {
   Local<Object> result = Nan::New<Object>();
   Local<Array> instance_list = Nan::New<Array>(end - current);
   for(uint32_t i = current; i < end; ++i) {
-    Local<Object> ins = Nan::New<Object>();
     std::string addr_str = *instances[i];
-    ins->Set(Nan::New<String>("address").ToLocalChecked(), Nan::New<String>(addr_str).ToLocalChecked());
     uint64_t addr = std::strtoull(addr_str.c_str(), nullptr, 16);
-    std::string desc = llnode->api->GetObject(addr, false);
-    ins->Set(Nan::New<String>("desc").ToLocalChecked(), Nan::New<String>(desc).ToLocalChecked());
-    instance_list->Set(i - current, ins);
+    inspect_t* inspect = llnode->api->Inspect(addr, false);
+    if(inspect == nullptr) {
+      Local<Object> error = Nan::New<Object>();
+      error->Set(Nan::New<String>("error").ToLocalChecked(),
+                 Nan::New<String>("Invalid value").ToLocalChecked());
+      instance_list->Set(i - current, error);
+      continue;
+    }
+    instance_list->Set(i - current, llnode->InspectJsObject(inspect));
   }
   delete pagination;
   if(end >= instance_count)
