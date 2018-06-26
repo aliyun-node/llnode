@@ -23,7 +23,7 @@ class LLV8;
 }
 
 typedef std::unordered_map<long long, frame_t*> FrameMap;
-typedef std::unordered_map<uint64_t, inspect_t*> InspectMap;
+typedef std::unordered_map<std::string, inspect_t*> InspectMap;
 typedef std::unordered_map<size_t, std::string**> InstancesMap;
 
 class LLNodeApi {
