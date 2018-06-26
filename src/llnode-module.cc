@@ -195,7 +195,12 @@ Local<Array> LLNode::GetProperties(properties_t* props) {
       Local<Object> tmp = Nan::New<Object>();
       property_t* prop = *(props->properties + i);
       // ignore hole
-      if(prop == nullptr) continue;
+      if(prop == nullptr) {
+        tmp->Set(Nan::New<String>("is_hole").ToLocalChecked(),
+                 Nan::New<Boolean>(true));
+        properties->Set(i, tmp);
+        continue;
+      };
       if(prop->value == nullptr)
         tmp->Set(Nan::New<String>(prop->key).ToLocalChecked(),
                  Nan::New<String>(prop->value_str).ToLocalChecked());
