@@ -116,7 +116,30 @@ std::string LLNodeApi::GetThreadStopReason(size_t thread_index) {
   char buf[100];
   thread.GetStopDescription(buf, 100);
   std::string res = buf;
-  return buf;
+  return res;
+}
+
+uint64_t LLNodeApi::GetThreadID(size_t thread_index) {
+  SBThread thread = process->GetThreadAtIndex(thread_index);
+  return thread.GetThreadID();
+}
+
+std::string LLNodeApi::GetThreadName(size_t thread_index) {
+  SBThread thread = process->GetThreadAtIndex(thread_index);
+  const char* buf = thread.GetName();
+  if(buf == nullptr)
+    return std::string();
+  std::string res = buf;
+  return res;
+}
+
+std::string LLNodeApi::GetThreadStartAddress(size_t thread_index) {
+  SBThread thread = process->GetThreadAtIndex(thread_index);
+  SBFrame frame = thread.GetFrameAtIndex(0);
+  char buf[20];
+  snprintf(buf, sizeof(buf), "0x%016" PRIx64, frame.GetPC());
+  std::string res = buf;
+  return res;
 }
 
 uint32_t LLNodeApi::GetThreadCount() {
