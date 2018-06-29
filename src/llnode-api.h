@@ -34,6 +34,8 @@ public:
   uint32_t GetProcessID();
   uint32_t GetThreadCount();
   std::string GetProcessState();
+  std::string GetExecutableName();
+  std::string GetThreadStopReason(size_t thread_index);
   std::string GetProcessInfo();
   uint32_t GetFrameCountByThreadId(size_t thread_index);
   frame_t* GetFrameInfo(size_t thread_index, size_t frame_index);

@@ -105,6 +105,20 @@ std::string LLNodeApi::GetProcessState() {
   }
 }
 
+std::string LLNodeApi::GetExecutableName() {
+  const char* str = target->GetExecutable().GetFilename();
+  std::string res = str;
+  return res;
+}
+
+std::string LLNodeApi::GetThreadStopReason(size_t thread_index) {
+  SBThread thread = process->GetThreadAtIndex(thread_index);
+  char buf[100];
+  thread.GetStopDescription(buf, 100);
+  std::string res = buf;
+  return buf;
+}
+
 uint32_t LLNodeApi::GetThreadCount() {
   return process->GetNumThreads();
 }
