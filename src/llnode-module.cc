@@ -113,18 +113,21 @@ bool LLNode::ScanHeap() {
 
 Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t limt) {
   Local<Object> result = Nan::New<Object>();
-  result->Set(Nan::New<String>("stop_reason").ToLocalChecked(),
-              Nan::New<String>(api->GetThreadStopReason(thread_index)).ToLocalChecked());
+  // set thread info
+  Local<Object> thread_info = Nan::New<Object>();
+  thread_info->Set(Nan::New<String>("tid").ToLocalChecked(),
+                   Nan::New<Number>(api->GetThreadID(thread_index)));
+  thread_info->Set(Nan::New<String>("name").ToLocalChecked(),
+                   Nan::New<String>(api->GetThreadName(thread_index)).ToLocalChecked());
+  thread_info->Set(Nan::New<String>("start_address").ToLocalChecked(),
+                   Nan::New<String>(api->GetThreadStartAddress(thread_index)).ToLocalChecked());
+  thread_info->Set(Nan::New<String>("stop_reason").ToLocalChecked(),
+                   Nan::New<String>(api->GetThreadStopReason(thread_index)).ToLocalChecked());
+  result->Set(Nan::New<String>("thread_info").ToLocalChecked(), thread_info);
   uint32_t frames = api->GetFrameCountByThreadId(thread_index);
   // pagination
-  size_t current = 0;
-  if(curt > 0)
-    current = curt;
-  size_t limit = 0;
-  if(limt > 0)
-    limit = limt;
-  else
-    limit = frames;
+  size_t current = curt;
+  size_t limit = limt;
   if(current >= frames)
     current = frames;
   size_t end = current + limit;

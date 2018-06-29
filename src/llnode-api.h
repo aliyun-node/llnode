@@ -35,8 +35,11 @@ public:
   uint32_t GetThreadCount();
   std::string GetProcessState();
   std::string GetExecutableName();
-  std::string GetThreadStopReason(size_t thread_index);
   std::string GetProcessInfo();
+  std::string GetThreadStopReason(size_t thread_index);
+  uint64_t GetThreadID(size_t thread_index);
+  std::string GetThreadName(size_t thread_index);
+  std::string GetThreadStartAddress(size_t thread_index);
   uint32_t GetFrameCountByThreadId(size_t thread_index);
   frame_t* GetFrameInfo(size_t thread_index, size_t frame_index);
   bool ScanHeap();
