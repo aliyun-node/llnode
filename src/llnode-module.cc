@@ -113,6 +113,8 @@ bool LLNode::ScanHeap() {
 
 Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t limt) {
   Local<Object> result = Nan::New<Object>();
+  result->Set(Nan::New<String>("stop_reason").ToLocalChecked(),
+              Nan::New<String>(api->GetThreadStopReason(thread_index)).ToLocalChecked());
   uint32_t frames = api->GetFrameCountByThreadId(thread_index);
   // pagination
   size_t current = 0;
@@ -444,7 +446,7 @@ void LLNode::GetProcessInfo(const Nan::FunctionCallbackInfo<Value>& info) {
   result->Set(Nan::New<String>("thread_count").ToLocalChecked(), Nan::New<Number>(thread_count));
   std::string state = llnode->api->GetProcessState();
   result->Set(Nan::New<String>("state").ToLocalChecked(), Nan::New<String>(state).ToLocalChecked());
-  std::string executable = llnode->core->executable;
+  std::string executable = llnode->api->GetExecutableName();
   result->Set(Nan::New<String>("executable").ToLocalChecked(), Nan::New<String>(executable).ToLocalChecked());
   info.GetReturnValue().Set(result);
 }
