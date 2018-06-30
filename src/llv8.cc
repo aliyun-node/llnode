@@ -999,7 +999,7 @@ std::string SharedFunctionInfo::GetPostfix(Error& err) {
   // There is no `Script` for functions created in C++ (and possibly others)
   int64_t type = script.GetType(err);
   if (err.Fail() || type != v8()->types()->kScriptType)
-    return std::string("(no script)");
+    return std::string("[native code]");
 
   String name = script.Name(err);
   if (err.Fail()) return std::string();
@@ -1008,7 +1008,7 @@ std::string SharedFunctionInfo::GetPostfix(Error& err) {
   if (err.Fail()) return std::string();
 
   std::string res = name.ToString(err);
-  if (res.empty()) res = "(no script)";
+  if (res.empty()) res = "[native code]";
 
   int64_t line = 0;
   int64_t column = 0;
@@ -1689,9 +1689,19 @@ first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
 
   unsigned int len = options->length;
 
-  if (len != 0 && val.length() > len) val = val.substr(0, len) + "...";
+  if (options->current != 0 && options->limit != 0) {
+    val = val.substr(options->current, options->limit) + "...";
+  } else {
+    if (len != 0 && val.length() > len) {
+      val = val.substr(0, len) + "...";
+      string->end = false;
+      string->current = len;
+    } else {
+      string->end = true;
+    }
+  }
 
-  string->display_value = "\"" + val + "\"";
+  string->display_value = val;
   return string;
 }
 
