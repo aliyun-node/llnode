@@ -265,9 +265,13 @@ typedef struct JsRegexp: inspect_t {
 typedef struct FirstNonString: inspect_t {
   int total_length;
   std::string display_value;
+  int current;
+  bool end;
   ~FirstNonString() {
     this->total_length = 0;
     this->display_value = "";
+    this->current = 0;
+    this->end = false;
   }
 } first_non_string_t;
 

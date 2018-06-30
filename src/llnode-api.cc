@@ -302,8 +302,9 @@ std::string LLNodeApi::GetObject(uint64_t address, bool detailed) {
   return result;
 }
 
-inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
-  std::string key = std::to_string(address) + std::to_string(detailed);
+inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed, unsigned int current, unsigned int limit) {
+  std::string key = std::to_string(address) + std::to_string(detailed)
+                    + std::to_string(current) + std::to_string(limit);
   if(inspect_map.count(key) != 0)
     return inspect_map.at(key);
   v8::Value v8_value(llscan->v8(), address);
@@ -311,6 +312,8 @@ inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed) {
   inspect_options.detailed = detailed;
   inspect_options.length = 100;
   inspect_options.start_address = address;
+  inspect_options.current = current;
+  inspect_options.limit = limit;
   // TDOD: search function source
   // inspect_options.print_source = true;
 
