@@ -363,6 +363,10 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
                 Nan::New<Number>(non_string->total_length));
     result->Set(Nan::New<String>("display").ToLocalChecked(),
                 Nan::New<String>(non_string->display_value).ToLocalChecked());
+    result->Set(Nan::New<String>("end").ToLocalChecked(),
+                Nan::New<Boolean>(non_string->end));
+    result->Set(Nan::New<String>("current").ToLocalChecked(),
+                Nan::New<Number>(non_string->current));
     break;
   }
   case InspectType::kJsArrayBuffer: {
@@ -565,9 +569,20 @@ void LLNode::InspectJsObjectAtAddress(const Nan::FunctionCallbackInfo<Value>& in
     Nan::ThrowTypeError("Invalid address");
     return;
   }
+  unsigned int current = 0;
+  unsigned int limit = 0;
+  if(info[1]->IsObject()) {
+    Local<Object> options = info[1]->ToObject();
+    Local<Value> c = options->Get(Nan::New<String>("current").ToLocalChecked());
+    if(c->IsNumber())
+      current = c->ToInteger()->Value();
+    Local<Value> l = options->Get(Nan::New<String>("limit").ToLocalChecked());
+    if(l->IsNumber())
+      limit = l->ToInteger()->Value();
+  }
   LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
   uint64_t addr = std::strtoull(*address_str, nullptr, 16);
-  inspect_t* inspect = llnode->api->Inspect(addr, true);
+  inspect_t* inspect = llnode->api->Inspect(addr, true, current, limit);
   if(inspect == nullptr) {
     Local<Object> error = Nan::New<Object>();
     error->Set(Nan::New<String>("error").ToLocalChecked(),

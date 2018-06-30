@@ -80,6 +80,8 @@ class Value {
     bool print_map;
     bool print_source;
     unsigned int length;
+    unsigned int current = 0;
+    unsigned int limit = 0;
     int64_t start_address;
   };
 
