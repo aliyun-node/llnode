@@ -174,6 +174,7 @@ class String : public HeapObject {
 
   std::string ToString(Error& err, bool utf16 = false);
   std::string Inspect(InspectOptions* options, Error& err);
+  unsigned long GetSubStr(unsigned long current, int limit, std::string val);
   first_non_string_t* InspectX(InspectOptions* options, Error& err);
 
   static inline bool IsString(LLV8* v8, HeapObject heap_object, Error& err);
