@@ -1679,6 +1679,16 @@ std::string String::Inspect(InspectOptions* options, Error& err) {
   return "<String \"" + val + "\", length=" + std::to_string(total_length) + ">";
 }
 
+unsigned long String::GetSubStr(unsigned long current, int limit, std::string val) {
+  unsigned long curt = current + limit;
+  int next = val[curt] - 0xFFFFFF00;
+  if( val.length() > curt + 1 && next < 192 && next > 127) {
+    return GetSubStr(current, limit + 1, val);
+  } else {
+    return limit;
+  }
+}
+
 first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
   std::string val = ToString(err);
   if (err.Fail()) return nullptr;
@@ -1690,7 +1700,16 @@ first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
   unsigned int len = options->length;
 
   if (options->current != 0 && options->limit != 0) {
-    val = val.substr(options->current, options->limit) + "...";
+    unsigned int next_current = options->current + options->limit;
+    if(val.length() > next_current) {
+      unsigned long limit = GetSubStr(options->current, options->limit, val);
+      val = val.substr(options->current, limit) + "...";
+      string->current = options->current + limit;
+      string->end = false;
+    } else {
+      val = val.substr(options->current);
+      string->end = true;
+    }
   } else {
     if (len != 0 && val.length() > len) {
       val = val.substr(0, len) + "...";
