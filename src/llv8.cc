@@ -1958,10 +1958,10 @@ std::string Oddball::Inspect(Error& err) {
 
   int64_t kind_val = kind.GetValue();
   if (kind_val == v8()->oddball()->kException) return "<exception>";
-  if (kind_val == v8()->oddball()->kFalse) return "<false>";
-  if (kind_val == v8()->oddball()->kTrue) return "<true>";
-  if (kind_val == v8()->oddball()->kUndefined) return "<undefined>";
-  if (kind_val == v8()->oddball()->kNull) return "<null>";
+  if (kind_val == v8()->oddball()->kFalse) return "false";
+  if (kind_val == v8()->oddball()->kTrue) return "true";
+  if (kind_val == v8()->oddball()->kUndefined) return "undefined";
+  if (kind_val == v8()->oddball()->kNull) return "null";
   if (kind_val == v8()->oddball()->kTheHole) return "<hole>";
   if (kind_val == v8()->oddball()->kUninitialized) return "<uninitialized>";
   return "<Oddball>";
@@ -1978,10 +1978,10 @@ oddball_t* Oddball::InspectX(Error& err) {
 
   int64_t kind_val = kind.GetValue();
   if (kind_val == v8()->oddball()->kException) oddball->value = "<exception>";
-  if (kind_val == v8()->oddball()->kFalse) oddball->value = "<false>";
-  if (kind_val == v8()->oddball()->kTrue) oddball->value = "<true>";
-  if (kind_val == v8()->oddball()->kUndefined) oddball->value = "<undefined>";
-  if (kind_val == v8()->oddball()->kNull) oddball->value = "<null>";
+  if (kind_val == v8()->oddball()->kFalse) oddball->value = "false";
+  if (kind_val == v8()->oddball()->kTrue) oddball->value = "true";
+  if (kind_val == v8()->oddball()->kUndefined) oddball->value = "undefined";
+  if (kind_val == v8()->oddball()->kNull) oddball->value = "null";
   if (kind_val == v8()->oddball()->kTheHole) oddball->value = "<hole>";
   if (kind_val == v8()->oddball()->kUninitialized) oddball->value = "<uninitialized>";
 
