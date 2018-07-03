@@ -200,13 +200,7 @@ class TypeRecord {
    * to give consistent ordering.
    */
   static bool CompareInstanceCounts(TypeRecord* a, TypeRecord* b) {
-    if (a->instance_count_ == b->instance_count_) {
-      if (a->total_instance_size_ == b->total_instance_size_) {
-        return a->type_name_ < b->type_name_;
-      }
-      return a->total_instance_size_ < b->total_instance_size_;
-    }
-    return a->instance_count_ < b->instance_count_;
+    return a->total_instance_size_ > b->total_instance_size_;
   }
 
 
