@@ -290,13 +290,16 @@ class JSObject : public HeapObject {
   js_object_t* InspectX(InspectOptions* options, Error& err);
   std::string InspectInternalFields(Error& err);
   internal_fileds_t* InspectInternalFieldsX(Error& err);
+  int64_t GetFieldsLength(Error& err);
   std::string InspectProperties(Error& err);
 
   std::string InspectElements(Error& err);
   elements_t* InspectElementsX(Error& err);
+  int64_t GetElementsLength(Error& err);
   std::string InspectElements(int64_t length, Error& err);
   elements_t* InspectElementsX(int64_t length, Error& err);
   std::string InspectDictionary(Error& err);
+  int64_t GetPropertiesLength(Error& err);
   properties_t* InspectDictionaryX(Error& err);
   std::string InspectDescriptors(Map map, Error& err);
   properties_t* InspectDescriptorsX(Map map, Error& err);

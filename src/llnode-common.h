@@ -180,11 +180,17 @@ typedef struct FixedArray: elements_t, inspect_t {
 
 typedef struct JsObject: inspect_t {
   std::string constructor;
+  int64_t elements_length = 0;
+  int64_t properties_length = 0;
+  int64_t fields_length = 0;
   elements_t* elements = nullptr;
   properties_t* properties = nullptr;
   internal_fileds_t* fields = nullptr;
   ~JsObject() {
     this->constructor = "";
+    this->elements_length = 0;
+    this->properties_length = 0;
+    this->fields_length = 0;
     delete this->elements;
     this->elements = nullptr;
     delete this->properties;
