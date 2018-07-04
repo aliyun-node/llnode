@@ -105,7 +105,8 @@ bool LLNode::ScanHeap() {
     if(!api->ScanHeap()) {
       return false;
     }
-    api->CacheAndSortHeap();
+    api->CacheAndSortHeapByCount();
+    api->CacheAndSortHeapBySize();
     heap_initialized = true;
   }
   return true;
@@ -514,7 +515,11 @@ void LLNode::GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(Nan::Undefined());
     return;
   }
-  uint32_t type_count = llnode->api->GetHeapTypeCount();
+  int object_show_type = 0;
+  if(info[2]->IsNumber()) {
+    object_show_type = static_cast<int>(info[2]->ToInteger()->Value());
+  }
+  uint32_t type_count = llnode->api->GetHeapTypeCount(object_show_type);
   pagination_t<uint32_t>* pagination = GetPagination<uint32_t>(info[0], info[1], type_count);
   uint32_t current = pagination->current;
   uint32_t end = pagination->end;
@@ -523,9 +528,9 @@ void LLNode::GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info) {
   for(uint32_t i = current; i < end; ++i) {
     Local<Object> type = Nan::New<Object>();
     type->Set(Nan::New<String>("index").ToLocalChecked(), Nan::New<Number>(i));
-    type->Set(Nan::New<String>("name").ToLocalChecked(), Nan::New<String>(llnode->api->GetTypeName(i)).ToLocalChecked());
-    type->Set(Nan::New<String>("count").ToLocalChecked(), Nan::New<Number>(llnode->api->GetTypeInstanceCount(i)));
-    type->Set(Nan::New<String>("size").ToLocalChecked(), Nan::New<Number>(llnode->api->GetTypeTotalSize(i)));
+    type->Set(Nan::New<String>("name").ToLocalChecked(), Nan::New<String>(llnode->api->GetTypeName(i, object_show_type)).ToLocalChecked());
+    type->Set(Nan::New<String>("count").ToLocalChecked(), Nan::New<Number>(llnode->api->GetTypeInstanceCount(i, object_show_type)));
+    type->Set(Nan::New<String>("size").ToLocalChecked(), Nan::New<Number>(llnode->api->GetTypeTotalSize(i, object_show_type)));
     object_list->Set(i - current, type);
   }
   delete pagination;
@@ -550,12 +555,16 @@ void LLNode::GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info) {
     info.GetReturnValue().Set(Nan::Undefined());
     return;
   }
+  int object_show_type = 0;
+  if(info[3]->IsNumber()) {
+    object_show_type = static_cast<int>(info[3]->ToInteger()->Value());
+  }
   size_t instance_index = static_cast<size_t>(info[0]->ToInteger()->Value());
-  uint32_t instance_count = llnode->api->GetTypeInstanceCount(instance_index);
+  uint32_t instance_count = llnode->api->GetTypeInstanceCount(instance_index, object_show_type);
   pagination_t<uint32_t>* pagination = GetPagination<uint32_t>(info[1], info[2], instance_count);
   uint32_t current = pagination->current;
   uint32_t end = pagination->end;
-  std::string** instances = llnode->api->GetTypeInstances(instance_index);
+  std::string** instances = llnode->api->GetTypeInstances(instance_index, object_show_type);
   Local<Object> result = Nan::New<Object>();
   Local<Array> instance_list = Nan::New<Array>(end - current);
   for(uint32_t i = current; i < end; ++i) {

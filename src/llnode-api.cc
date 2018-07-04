@@ -230,51 +230,73 @@ bool LLNodeApi::ScanHeap() {
   return true;
 }
 
-void LLNodeApi::CacheAndSortHeap() {
-  object_types.clear();
+void LLNodeApi::CacheAndSortHeapByCount() {
+  object_types_by_count.clear();
   for (const auto& kv : llscan->GetMapsToInstances()) {
     // put TypeRecord*
-    object_types.push_back(kv.second);
+    object_types_by_count.push_back(kv.second);
   }
   // sort by count
-  std::sort(object_types.begin(), object_types.end(),
+  std::sort(object_types_by_count.begin(), object_types_by_count.end(),
             TypeRecord::CompareInstanceCounts);
 }
 
-uint32_t LLNodeApi::GetHeapTypeCount() {
-  return object_types.size();
+void LLNodeApi::CacheAndSortHeapBySize() {
+  object_types_by_size.clear();
+  for (const auto& kv : llscan->GetMapsToInstances()) {
+    // put TypeRecord*
+    object_types_by_size.push_back(kv.second);
+  }
+  // sort by size
+  std::sort(object_types_by_size.begin(), object_types_by_size.end(),
+            TypeRecord::CompareInstanceSizes);
 }
 
-std::string LLNodeApi::GetTypeName(size_t type_index) {
-  if (object_types.size() <= type_index) {
+uint32_t LLNodeApi::GetHeapTypeCount(int type) {
+  bool by_count = type == 1;
+  std::vector<TypeRecord*> objet_types = by_count ? object_types_by_count : object_types_by_size;
+  return objet_types.size();
+}
+
+std::string LLNodeApi::GetTypeName(size_t type_index, int type) {
+  bool by_count = type == 1;
+  std::vector<TypeRecord*> objet_types = by_count ? object_types_by_count : object_types_by_size;
+  if (objet_types.size() <= type_index) {
     return "";
   }
-  return object_types[type_index]->GetTypeName();
+  return objet_types[type_index]->GetTypeName();
 }
 
-uint32_t LLNodeApi::GetTypeInstanceCount(size_t type_index) {
-  if (object_types.size() <= type_index) {
+uint32_t LLNodeApi::GetTypeInstanceCount(size_t type_index, int type) {
+  bool by_count = type == 1;
+  std::vector<TypeRecord*> objet_types = by_count ? object_types_by_count : object_types_by_size;
+  if (objet_types.size() <= type_index) {
     return 0;
   }
-  return object_types[type_index]->GetInstanceCount();
+  return objet_types[type_index]->GetInstanceCount();
 }
 
-uint32_t LLNodeApi::GetTypeTotalSize(size_t type_index) {
-  if (object_types.size() <= type_index) {
+uint32_t LLNodeApi::GetTypeTotalSize(size_t type_index, int type) {
+  bool by_count = type == 1;
+  std::vector<TypeRecord*> objet_types = by_count ? object_types_by_count : object_types_by_size;
+  if (objet_types.size() <= type_index) {
     return 0;
   }
-  return object_types[type_index]->GetTotalInstanceSize();
+  return objet_types[type_index]->GetTotalInstanceSize();
 }
 
-string** LLNodeApi::GetTypeInstances(size_t type_index) {
-  if(instances_map.count(type_index) != 0)
-    return instances_map.at(type_index);
-  if (object_types.size() <= type_index) {
+string** LLNodeApi::GetTypeInstances(size_t type_index, int type) {
+  bool by_count = type == 1;
+  std::vector<TypeRecord*> objet_types = by_count ? object_types_by_count : object_types_by_size;
+  std::string key = std::to_string(type) + std::to_string(type_index);
+  if(instances_map.count(key) != 0)
+    return instances_map.at(key);
+  if (objet_types.size() <= type_index) {
     return nullptr;
   }
-  uint32_t length = object_types[type_index]->GetInstanceCount();
+  uint32_t length = objet_types[type_index]->GetInstanceCount();
   string** instances = new string*[length];
-  std::set<uint64_t> list = object_types[type_index]->GetInstances();
+  std::set<uint64_t> list = objet_types[type_index]->GetInstances();
   uint32_t index = 0;
   for(auto it = list.begin(); it != list.end(); ++it) {
     char buf[20];
@@ -283,7 +305,7 @@ string** LLNodeApi::GetTypeInstances(size_t type_index) {
     if(index < length)
       instances[index++] = addr;
   }
-  instances_map.insert(InstancesMap::value_type(type_index, instances));
+  instances_map.insert(InstancesMap::value_type(key, instances));
   return instances;
 }
 
