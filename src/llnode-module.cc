@@ -308,6 +308,13 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
     js_object_t* js_object = static_cast<js_object_t*>(inspect);
     result->Set(Nan::New<String>("constructor").ToLocalChecked(),
                 Nan::New<String>(js_object->constructor).ToLocalChecked());
+    result->Set(Nan::New<String>("elements_length").ToLocalChecked(),
+                Nan::New<Number>(js_object->elements_length));
+    result->Set(Nan::New<String>("properties_length").ToLocalChecked(),
+                Nan::New<Number>(js_object->properties_length));
+    result->Set(Nan::New<String>("fields_length").ToLocalChecked(),
+                Nan::New<Number>(js_object->fields_length));
+
     if(js_object->elements != nullptr)
       result->Set(Nan::New<String>("elements").ToLocalChecked(),
                   GetElements(js_object->elements));

@@ -1210,7 +1210,7 @@ std::string HeapObject::ToString(Error& err) {
     return str.ToString(err);
   }
 
-  return "<non-string>";
+  return "[non-string]";
 }
 
 
@@ -2363,6 +2363,11 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
     return nullptr;
   }
 
+  // set elements, properties and internal fields length
+  js_object->elements_length = GetElementsLength(err);
+  js_object->properties_length = GetPropertiesLength(err);
+  js_object->fields_length = GetFieldsLength(err);
+
   if (options->detailed) {
     // add elements
     js_object->elements = InspectElementsX(err);
@@ -2467,7 +2472,7 @@ internal_fileds_t* JSObject::InspectInternalFieldsX(Error& err) {
   // skip them.
   instance_size -= in_object_props * v8()->common()->kPointerSize;
   // calculate length
-  int length = 0;
+  int64_t length = 0;
   for (int64_t off = v8()->js_object()->kInternalFieldsOffset;
        off < instance_size; off += v8()->common()->kPointerSize)
     ++length;
@@ -2475,7 +2480,7 @@ internal_fileds_t* JSObject::InspectInternalFieldsX(Error& err) {
   internal_filed_t** fieldtmp = new internal_filed_t*[length];
   fields->length = length;
   fields->internal_fileds = fieldtmp;
-  int i = 0;
+  int64_t i = 0;
   for (int64_t off = v8()->js_object()->kInternalFieldsOffset;
        off < instance_size; off += v8()->common()->kPointerSize) {
     int64_t field = LoadField(off, err);
@@ -2495,6 +2500,36 @@ internal_fileds_t* JSObject::InspectInternalFieldsX(Error& err) {
   return fields;
 }
 
+int64_t JSObject::GetFieldsLength(Error& err) {
+  HeapObject map_obj = GetMap(err);
+  if (err.Fail()) return 0;
+
+  Map map(map_obj);
+  int64_t type = map.GetType(err);
+  if (err.Fail()) return 0;
+
+  // Only JSObject for now
+  if (!JSObject::IsObjectType(v8(), type)) return 0;
+
+  int64_t instance_size = map.InstanceSize(err);
+
+  // kVariableSizeSentinel == 0
+  // TODO(indutny): post-mortem constant for this?
+  if (err.Fail() || instance_size == 0) return 0;
+
+  int64_t in_object_props = map.InObjectProperties(err);
+  if (err.Fail()) return 0;
+
+  // in-object properties are appended to the end of the JSObject,
+  // skip them.
+  instance_size -= in_object_props * v8()->common()->kPointerSize;
+  // calculate length
+  int64_t length = 0;
+  for (int64_t off = v8()->js_object()->kInternalFieldsOffset;
+       off < instance_size; off += v8()->common()->kPointerSize)
+    ++length;
+  return length;
+}
 
 std::string JSObject::InspectProperties(Error& err) {
   std::string res;
@@ -2540,6 +2575,18 @@ std::string JSObject::InspectElements(Error& err) {
 
   int64_t length = length_smi.GetValue();
   return InspectElements(length, err);
+}
+
+int64_t JSObject::GetElementsLength(Error& err) {
+  HeapObject elements_obj = Elements(err);
+  if (err.Fail()) return 0;
+
+  FixedArray elements(elements_obj);
+
+  Smi length_smi = elements.Length(err);
+  if (err.Fail()) return 0;
+
+  return length_smi.GetValue();
 }
 
 elements_t* JSObject::InspectElementsX(Error& err) {
@@ -2661,6 +2708,32 @@ std::string JSObject::InspectDictionary(Error& err) {
   }
 
   return res;
+}
+
+int64_t JSObject::GetPropertiesLength(Error& err) {
+  HeapObject map_obj = GetMap(err);
+  if (err.Fail()) return 0;
+  Map map(map_obj);
+  bool is_dict = map.IsDictionary(err);
+  if (err.Fail()) return 0;
+  if (is_dict) {
+    HeapObject dictionary_obj = Properties(err);
+    if (err.Fail()) return 0;
+
+    NameDictionary dictionary(dictionary_obj);
+
+    int64_t length = dictionary.Length(err);
+    if (err.Fail()) return 0;
+    return length;
+  } else {
+    HeapObject descriptors_obj = map.InstanceDescriptors(err);
+    if (err.Fail()) return 0;
+
+    DescriptorArray descriptors(descriptors_obj);
+    int64_t own_descriptors_count = map.NumberOfOwnDescriptors(err);
+    if (err.Fail()) return 0;
+    return own_descriptors_count;
+  }
 }
 
 properties_t* JSObject::InspectDictionaryX(Error& err) {
