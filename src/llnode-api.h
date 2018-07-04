@@ -24,7 +24,7 @@ class LLV8;
 
 typedef std::unordered_map<long long, frame_t*> FrameMap;
 typedef std::unordered_map<std::string, inspect_t*> InspectMap;
-typedef std::unordered_map<size_t, std::string**> InstancesMap;
+typedef std::unordered_map<std::string, std::string**> InstancesMap;
 
 class LLNodeApi {
 public:
@@ -43,12 +43,13 @@ public:
   uint32_t GetFrameCountByThreadId(size_t thread_index);
   frame_t* GetFrameInfo(size_t thread_index, size_t frame_index);
   bool ScanHeap();
-  void CacheAndSortHeap();
-  uint32_t GetHeapTypeCount();
-  std::string GetTypeName(size_t type_index);
-  uint32_t GetTypeInstanceCount(size_t type_index);
-  uint32_t GetTypeTotalSize(size_t type_index);
-  std::string** GetTypeInstances(size_t type_index);
+  void CacheAndSortHeapByCount();
+  void CacheAndSortHeapBySize();
+  uint32_t GetHeapTypeCount(int type = 0);
+  std::string GetTypeName(size_t type_index, int type = 0);
+  uint32_t GetTypeInstanceCount(size_t type_index, int type = 0);
+  uint32_t GetTypeTotalSize(size_t type_index, int type = 0);
+  std::string** GetTypeInstances(size_t type_index, int type = 0);
   std::string GetObject(uint64_t address, bool detailed);
   inspect_t* Inspect(uint64_t address, bool detailed, unsigned int current = 0, unsigned int limit = 0);
 
@@ -61,7 +62,8 @@ private:
   std::unique_ptr<lldb::SBProcess> process;
   std::unique_ptr<v8::LLV8> llv8;
   std::unique_ptr<LLScan> llscan;
-  std::vector<TypeRecord*> object_types;
+  std::vector<TypeRecord*> object_types_by_count;
+  std::vector<TypeRecord*> object_types_by_size;
   FrameMap frame_map;
   InspectMap inspect_map;
   InstancesMap instances_map;
