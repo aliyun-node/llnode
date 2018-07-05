@@ -124,7 +124,8 @@ Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t
                    Nan::New<String>(api->GetThreadStartAddress(thread_index)).ToLocalChecked());
   thread_info->Set(Nan::New<String>("stop_reason").ToLocalChecked(),
                    Nan::New<String>(api->GetThreadStopReason(thread_index)).ToLocalChecked());
-  result->Set(Nan::New<String>("thread_info").ToLocalChecked(), thread_info);
+  thread_info->Set(Nan::New<String>("thread_index").ToLocalChecked(),
+                   Nan::New<Number>(thread_index));
   uint32_t frames = api->GetFrameCountByThreadId(thread_index);
   // pagination
   size_t current = curt;
@@ -195,6 +196,22 @@ Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t
     result->Set(Nan::New<String>("frame_left").ToLocalChecked(), Nan::New<Number>(frames - end));
   }
   result->Set(Nan::New<String>("frame_list").ToLocalChecked(), frame_list);
+  // check if this thread has js frame
+  bool has_js_frame = false;
+  for(size_t frame_index = 0; frame_index < frames; ++frame_index) {
+    frame_t* ft = api->GetFrameInfo(thread_index, frame_index);
+    if(ft == nullptr)
+      continue;
+    if(ft->name == "JavaScript" && !has_js_frame) {
+      has_js_frame = true;
+      break;
+    }
+  }
+  if(has_js_frame)
+    thread_info->Set(Nan::New<String>("has_js_frame").ToLocalChecked(), Nan::New<Boolean>(true));
+  else
+    thread_info->Set(Nan::New<String>("has_js_frame").ToLocalChecked(), Nan::New<Boolean>(false));
+  result->Set(Nan::New<String>("thread_info").ToLocalChecked(), thread_info);
   return result;
 }
 
