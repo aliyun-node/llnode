@@ -112,7 +112,7 @@ bool LLNode::ScanHeap() {
   return true;
 }
 
-Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t limt) {
+Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t limt, bool limit_is_number) {
   Local<Object> result = Nan::New<Object>();
   // set thread info
   Local<Object> thread_info = Nan::New<Object>();
@@ -128,7 +128,11 @@ Local<Object> LLNode::GetThreadInfoById(size_t thread_index, size_t curt, size_t
   uint32_t frames = api->GetFrameCountByThreadId(thread_index);
   // pagination
   size_t current = curt;
-  size_t limit = limt;
+  size_t limit;
+  if(limit_is_number)
+    limit = limt;
+  else
+    limit = frames;
   if(current >= frames)
     current = frames;
   size_t end = current + limit;
@@ -498,12 +502,12 @@ void LLNode::GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info) {
     Local<Array> result = Nan::New<Array>(length);
     for(int i = 0; i < length; ++i) {
       size_t thread_index = static_cast<size_t>(list->Get(Nan::New<Number>(i))->ToInteger()->Value());
-      result->Set(i, llnode->GetThreadInfoById(thread_index, current, limit));
+      result->Set(i, llnode->GetThreadInfoById(thread_index, current, limit, info[2]->IsNumber()));
     }
     info.GetReturnValue().Set(result);
   } else if(info[0]->IsNumber()) {
     Local<Array> result = Nan::New<Array>(1);
-    result->Set(0, llnode->GetThreadInfoById(static_cast<size_t>(info[0]->ToInteger()->Value()), current, limit));
+    result->Set(0, llnode->GetThreadInfoById(static_cast<size_t>(info[0]->ToInteger()->Value()), current, limit, info[2]->IsNumber()));
     info.GetReturnValue().Set(result);
   }
 }
