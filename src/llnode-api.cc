@@ -29,6 +29,7 @@ using lldb::SBFrame;
 using lldb::SBSymbol;
 using lldb::SBCommandReturnObject;
 using lldb::StateType;
+using lldb::SBLineEntry;
 
 LLNodeApi::LLNodeApi(LLNode* llnode)
   : llnode(llnode),
@@ -177,9 +178,12 @@ frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
     lldb::SBFileSpec compileUnitFileSpec = compileUnit.GetFileSpec();
     if (compileUnitFileSpec.GetDirectory() != nullptr ||
         compileUnitFileSpec.GetFilename() != nullptr) {
+      SBLineEntry entry = frame.GetLineEntry();
       nft->compile_unit_file =
         static_cast<std::string>(compileUnitFileSpec.GetDirectory()) + "/" +
-        static_cast<std::string>(compileUnitFileSpec.GetFilename());
+        static_cast<std::string>(compileUnitFileSpec.GetFilename()) + ":" +
+        std::to_string(entry.GetLine()) + ":" +
+        std::to_string(entry.GetColumn());
     }
     frame_map.insert(FrameMap::value_type(key, nft));
     return nft;
