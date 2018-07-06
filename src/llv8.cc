@@ -1698,16 +1698,24 @@ first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
   string->total_length = val.length();
 
   unsigned int len = options->length;
-
-  if (options->current != 0 && options->limit != 0) {
-    unsigned int next_current = options->current + options->limit;
+  if(options->current > val.length() - 1) {
+    string->end = true;
+    string->current = val.length() - 1;
+    val = "";
+  } else if (options->current != 0 && options->limit != 0) {
+    int option_current = options->current;
+    if(option_current < 0) option_current = 0;
+    int option_limit = options->limit;
+    if(option_limit < 0) option_limit = 0;
+    unsigned int next_current = option_current + option_limit;
     if(val.length() > next_current) {
-      unsigned long limit = GetSubStr(options->current, options->limit, val);
-      val = val.substr(options->current, limit) + "...";
-      string->current = options->current + limit;
+      unsigned long limit = GetSubStr(option_current, option_limit, val);
+      val = val.substr(option_current, limit) + "...";
+      string->current = option_current + limit;
       string->end = false;
     } else {
       val = val.substr(options->current);
+      string->current = val.length();
       string->end = true;
     }
   } else {
@@ -1716,6 +1724,7 @@ first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
       string->end = false;
       string->current = len;
     } else {
+      string->current = val.length() - 1;
       string->end = true;
     }
   }
