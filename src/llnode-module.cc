@@ -358,12 +358,17 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
     js_array_t* js_array = static_cast<js_array_t*>(inspect);
     result->Set(Nan::New<String>("total_length").ToLocalChecked(),
                 Nan::New<Number>(js_array->total_length));
-    if(js_array->display_elemets != nullptr)
+    if(js_array->display_elemets != nullptr) {
+      result->Set(Nan::New<String>("current").ToLocalChecked(),
+                  Nan::New<Number>(js_array->display_elemets->current));
       result->Set(Nan::New<String>("display_array").ToLocalChecked(),
                   GetElements(js_array->display_elemets));
-    else
+    } else {
+      result->Set(Nan::New<String>("current").ToLocalChecked(),
+                  Nan::New<Number>(0));
       result->Set(Nan::New<String>("display_array").ToLocalChecked(),
                   Nan::New<Array>(0));
+    }
     break;
   }
   case InspectType::kOddball: {
@@ -418,6 +423,8 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
     if(!array_buffer->neutered) {
       result->Set(Nan::New<String>("byte_length").ToLocalChecked(),
                   Nan::New<Number>(array_buffer->byte_length));
+      result->Set(Nan::New<String>("current").ToLocalChecked(),
+                  Nan::New<Number>(array_buffer->current));
       result->Set(Nan::New<String>("backing_store_address").ToLocalChecked(),
                   Nan::New<String>(array_buffer->backing_store_address).ToLocalChecked());
       result->Set(Nan::New<String>("display_array").ToLocalChecked(),
@@ -432,6 +439,8 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
     if(!array_buffer_view->neutered) {
       result->Set(Nan::New<String>("byte_length").ToLocalChecked(),
                   Nan::New<Number>(array_buffer_view->byte_length));
+      result->Set(Nan::New<String>("current").ToLocalChecked(),
+                  Nan::New<Number>(array_buffer_view->current));
       result->Set(Nan::New<String>("byte_offset").ToLocalChecked(),
                   Nan::New<Number>(array_buffer_view->byte_offset));
       result->Set(Nan::New<String>("backing_store_address").ToLocalChecked(),

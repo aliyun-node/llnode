@@ -297,7 +297,7 @@ class JSObject : public HeapObject {
   elements_t* InspectElementsX(Error& err);
   int64_t GetElementsLength(Error& err);
   std::string InspectElements(int64_t length, Error& err);
-  elements_t* InspectElementsX(int64_t length, Error& err);
+  elements_t* InspectElementsX(int64_t length, Error& err, int64_t current = 0, int64_t limit = 0);
   std::string InspectDictionary(Error& err);
   int64_t GetPropertiesLength(Error& err);
   properties_t* InspectDictionaryX(Error& err);
@@ -533,7 +533,7 @@ class LLV8 {
   int64_t LoadUnsigned(int64_t addr, uint32_t byte_size, Error& err);
   double LoadDouble(int64_t addr, Error& err);
   std::string LoadBytes(int64_t addr, int64_t length, Error& err);
-  std::string* LoadBytesX(int64_t addr, int64_t length, Error& err);
+  std::string* LoadBytesX(int64_t addr, int64_t length, int64_t start, int64_t end, Error& err);
   std::string LoadString(int64_t addr, int64_t length, Error& err);
   std::string LoadTwoByteString(int64_t addr, int64_t length, Error& err, bool utf16 = false);
   void ConvertUTF16toUTF8 (const UTF16** sourceStart, const UTF16* sourceEnd,

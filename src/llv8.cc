@@ -132,7 +132,7 @@ std::string LLV8::LoadBytes(int64_t addr, int64_t length, Error& err) {
   return res;
 }
 
-std::string* LLV8::LoadBytesX(int64_t addr, int64_t length, Error& err) {
+std::string* LLV8::LoadBytesX(int64_t addr, int64_t length, int64_t start, int64_t end, Error& err) {
   uint8_t* buf = new uint8_t[length + 1];
   SBError sberr;
   process_.ReadMemory(addr, buf, static_cast<size_t>(length), sberr);
@@ -145,11 +145,11 @@ std::string* LLV8::LoadBytesX(int64_t addr, int64_t length, Error& err) {
     return nullptr;
   }
 
-  std::string* list = new std::string[length];
+  std::string* list = new std::string[end - start];
   char tmp[10];
-  for (int i = 0; i < length; ++i) {
-    snprintf(tmp, sizeof(tmp), "%s%02x", (i == 0 ? "" : ", "), buf[i]);
-    list[i] = tmp;
+  for (int64_t i = start; i < end; ++i) {
+    snprintf(tmp, sizeof(tmp), "%02x", buf[i]);
+    list[i - start] = tmp;
   }
   delete[] buf;
   return list;
@@ -2068,9 +2068,18 @@ js_array_buffer_t* JSArrayBuffer::InspectX(InspectOptions* options, Error& err) 
   array_buffer->backing_store_address = tmp;
 
   if (options->detailed) {
-    int display_length = std::min<int>(byte_length, options->length);
-    array_buffer->display_length = display_length;
-    array_buffer->elements = v8()->LoadBytesX(data, display_length, err);
+    int option_current = options->current;
+    if(option_current < 0) option_current = 0;
+    int option_limit = options->limit;
+    if(option_limit < 0) option_limit = 0;
+    int64_t start = option_current;
+    if(start >= byte_length) start = byte_length;
+    int64_t end = byte_length;
+    if(option_limit != 0) end = option_current + option_limit;
+    if(end >= byte_length) end = byte_length;
+    array_buffer->current = end;
+    array_buffer->display_length = end - start;
+    array_buffer->elements = v8()->LoadBytesX(data, byte_length, start, end, err);
   } else {
     array_buffer->elements = nullptr;
   }
@@ -2200,9 +2209,18 @@ js_array_buffer_view_t* JSArrayBufferView::InspectX(InspectOptions* options, Err
   array_buffer_view->backing_store_address = tmp;
 
   if(options->detailed) {
-    int display_length = std::min<int>(byte_length, options->length);
-    array_buffer_view->display_length = display_length;
-    array_buffer_view->elements = v8()->LoadBytesX(data + byte_offset, display_length, err);
+    int option_current = options->current;
+    if(option_current < 0) option_current = 0;
+    int option_limit = options->limit;
+    if(option_limit < 0) option_limit = 0;
+    int64_t start = option_current;
+    if(start >= byte_length) start = byte_length;
+    int64_t end = byte_length;
+    if(option_limit != 0) end = option_current + option_limit;
+    if(end >= byte_length) end = byte_length;
+    array_buffer_view->current = end;
+    array_buffer_view->display_length = end - start;
+    array_buffer_view->elements = v8()->LoadBytesX(data + byte_offset, byte_length, start, end, err);
   } else {
     array_buffer_view->elements = nullptr;
   }
@@ -2643,18 +2661,24 @@ std::string JSObject::InspectElements(int64_t length, Error& err) {
   return res;
 }
 
-elements_t* JSObject::InspectElementsX(int64_t length, Error& err) {
+elements_t* JSObject::InspectElementsX(int64_t length, Error& err, int64_t current, int64_t limit) {
   HeapObject elements_obj = Elements(err);
   if (err.Fail()) return nullptr;
   FixedArray elements(elements_obj);
 
   InspectOptions options;
 
+  int64_t start = current;
+  if(start >= length) start = length;
+  int64_t end = length;
+  if(limit != 0) end = current + limit;
+  if(end >= length) end = length;
   elements_t* elementstmp = new elements_t;
-  inspect_t** element = new inspect_t*[length];
-  elementstmp->length = static_cast<int>(length);
+  inspect_t** element = new inspect_t*[end - start];
+  elementstmp->length = static_cast<int>(end - start);
   elementstmp->elements = element;
-  for (int64_t i = 0; i < length; i++) {
+  elementstmp->current = end;
+  for (int64_t i = start; i < end; i++) {
     Value value = elements.Get<Value>(i, err);
     if (err.Fail()) {
       delete elementstmp;
@@ -2669,11 +2693,11 @@ elements_t* JSObject::InspectElementsX(int64_t length, Error& err) {
     }
 
     if (is_hole) {
-      element[i] = nullptr;
+      element[i - start] = nullptr;
       continue;
     }
 
-    element[i] = value.InspectX(&options, err);
+    element[i - start] = value.InspectX(&options, err);
     if (err.Fail()) {
       delete elementstmp;
       return nullptr;
@@ -3434,8 +3458,12 @@ js_array_t* JSArray::InspectX(InspectOptions* options, Error& err) {
   js_array->name = "Array";
   js_array->total_length = static_cast<int>(length);
   if (options->detailed) {
-    int64_t display_length = std::min<int64_t>(length, options->length);
-    js_array->display_elemets = InspectElementsX(display_length, err);
+    // int64_t display_length = std::min<int64_t>(length, options->length);
+    int option_current = options->current;
+    if(option_current < 0) option_current = 0;
+    int option_limit = options->limit;
+    if(option_limit < 0) option_limit = 0;
+    js_array->display_elemets = InspectElementsX(length, err, option_current, option_limit);
     if (err.Fail()) {
       delete js_array;
       return nullptr;

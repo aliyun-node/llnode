@@ -125,9 +125,11 @@ typedef struct Properties {
 
 typedef struct Element {
   int length = 0;
+  int current = 0;
   inspect_t** elements = nullptr;
   ~Element() {
     this->length = 0;
+    this->current = 0;
     delete[] this->elements;
     this->elements = nullptr;
   }
@@ -288,6 +290,7 @@ typedef struct JsArrayBuffer: inspect_t {
   std::string backing_store_address = "";
   int display_length = 0;
   std::string* elements = nullptr;
+  int current = 0;
   ~JsArrayBuffer() {
     this->neutered = false;
     this->byte_length = 0;
@@ -295,6 +298,7 @@ typedef struct JsArrayBuffer: inspect_t {
     this->display_length = 0;
     delete[] elements;
     this->elements = nullptr;
+    this->current = 0;
   }
 } js_array_buffer_t;
 
@@ -306,6 +310,7 @@ typedef struct JsArrayBufferView: inspect_t {
   std::string backing_store_address = "";
   int display_length = 0;
   std::string* elements = nullptr;
+  int current = 0;
   ~JsArrayBufferView() {
     this->neutered = false;
     this->byte_length = 0;
@@ -314,6 +319,7 @@ typedef struct JsArrayBufferView: inspect_t {
     this->display_length = 0;
     delete[] this->elements;
     this->elements = nullptr;
+    this->current = 0;
   }
 } js_array_buffer_view_t;
 
