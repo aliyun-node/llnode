@@ -1911,7 +1911,7 @@ context_t* Context::InspectX(Error& err) {
 
   {
     char tmp[128];
-    snprintf(tmp, sizeof(tmp), " 0x%016" PRIx64, closure.raw());
+    snprintf(tmp, sizeof(tmp), "0x%016" PRIx64, closure.raw());
     context->closure_address = tmp;
 
     InspectOptions options;
