@@ -633,7 +633,12 @@ args_t* JSFrame::InspectArgsX(JSFunction fn, Error& err) {
   }
 
   args->length = param_count;
-  args->args_list = new inspect_t*[param_count];
+  try {
+    args->args_list = new inspect_t*[param_count];
+  } catch(std::bad_alloc) {
+    delete args;
+    return nullptr;
+  }
   for (int64_t i = 0; i < param_count; i++) {
     Value param = GetParam(i, param_count, err);
     if (err.Fail()) {
