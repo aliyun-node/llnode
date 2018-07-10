@@ -58,7 +58,7 @@ typedef struct Frame {
 } frame_t;
 
 typedef struct Args {
-  int length = 0;
+  int64_t length = 0;
   inspect_t* context = nullptr;
   inspect_t** args_list = nullptr;
   ~Args() {

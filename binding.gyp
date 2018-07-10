@@ -86,7 +86,14 @@
       "src/constants.cc",
       "src/node-constants"
     ],
+    'cflags!': [ '-fno-exceptions' ],
+    'cflags_cc!': [ '-fno-exceptions' ],
     "conditions": [
+      ['OS=="mac"', {
+          'xcode_settings': {
+            'GCC_ENABLE_CPP_EXCEPTIONS': 'YES'
+          }
+      }],
       [ "OS=='linux' or OS=='freebsd'", {
         "conditions": [
           # If we could not locate the lib dir, then we will have to search
