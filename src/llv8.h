@@ -536,9 +536,7 @@ class LLV8 {
   std::string* LoadBytesX(int64_t addr, int64_t length, int64_t start, int64_t end, Error& err);
   std::string LoadString(int64_t addr, int64_t length, Error& err);
   std::string LoadTwoByteString(int64_t addr, int64_t length, Error& err, bool utf16 = false);
-  void ConvertUTF16toUTF8 (const UTF16** sourceStart, const UTF16* sourceEnd,
-    UTF8** targetStart, UTF8* targetEnd, ConversionFlags flags, Error& err);
-  std::string ConvertUTF16ToUTF8String(UTF16* buf, int64_t length, Error& err);
+  std::string Utf16ToUtf8(const std::u16string& u16_str);
   uint8_t* LoadChunk(int64_t addr, int64_t length, Error& err);
 
   lldb::SBTarget target_;
