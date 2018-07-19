@@ -46,15 +46,26 @@ Local<Array> GetDisPlayElements(T* eles) {
 
 Nan::Persistent<Function> LLNode::constructor;
 
-LLNode::LLNode(char* core_path, char* executable_path)
+LLNode::LLNode(char* core_path, char* executable_path, Local<Value> value)
   : api(new LLNodeApi(this)) {
+  // set core path
   core = new core_wrap_t;
   int core_path_length = strlen(core_path) + 1;
   core->core = new char[core_path_length];
   strncpy(core->core, core_path, core_path_length);
+  // set executable path
   int executable_path_length = strlen(executable_path) + 1;
   core->executable = new char[executable_path_length];
   strncpy(core->executable, executable_path, executable_path_length);
+  // set options
+  if(value->IsObject()) {
+    Local<Object> options = value->ToObject();
+    Local<Value> scan_monitor_value = options->Get(Nan::New<String>("heap_scan_monitor").ToLocalChecked());
+    if(scan_monitor_value->IsFunction()) {
+      Local<Function> cb = scan_monitor_value.As<Function>();
+      core->heap_scan_monitor.Reset(cb);
+    }
+  }
 }
 LLNode::~LLNode() {}
 
@@ -84,12 +95,12 @@ void LLNode::New(const Nan::FunctionCallbackInfo<Value>& info) {
   if (info.IsConstructCall()) {
     Nan::Utf8String core_path(info[0]->ToString());
     Nan::Utf8String executable_path(info[1]->ToString());
-    LLNode* llnode = new LLNode(*core_path, *executable_path);
+    LLNode* llnode = new LLNode(*core_path, *executable_path, info[2]);
     llnode->Wrap(info.This());
     info.GetReturnValue().Set(info.This());
   } else {
-    const int argc = 2;
-    Local<Value> argv[argc] = { info[0], info[1] };
+    const int argc = 3;
+    Local<Value> argv[argc] = { info[0], info[1], info[2] };
     Local<Function> cons = Nan::New<Function>(constructor);
     info.GetReturnValue().Set((Nan::NewInstance(cons, argc, argv)).ToLocalChecked());
   }
@@ -97,6 +108,14 @@ void LLNode::New(const Nan::FunctionCallbackInfo<Value>& info) {
 
 core_wrap_t* LLNode::GetCore() {
   return core;
+}
+
+void LLNode::HeapScanMonitir(uint32_t now, uint32_t total) {
+  Local<Function> heap_scan_monitor = Nan::New<Function>(core->heap_scan_monitor);
+  Local<Object> recv = Nan::New<Object>();
+  const int argc = 2;
+  Local<Value> argv[argc] = { Nan::New<Number>(now), Nan::New<Number>(total) };
+  Nan::Call(heap_scan_monitor, recv, argc, argv);
 }
 
 bool LLNode::ScanHeap() {
@@ -109,6 +128,7 @@ bool LLNode::ScanHeap() {
     api->CacheAndSortHeapBySize();
     heap_initialized = true;
   }
+  HeapScanMonitir(99, 100);
   return true;
 }
 

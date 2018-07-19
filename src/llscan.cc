@@ -1292,7 +1292,8 @@ bool FindJSObjectsVisitor::IsAHistogramType(v8::Map& map, Error& err) {
 
 
 bool LLScan::ScanHeapForObjects(lldb::SBTarget target,
-                                lldb::SBCommandReturnObject& result) {
+                                lldb::SBCommandReturnObject& result,
+                                HeapScanMonitor* scan) {
   /* Check the last scan is still valid - the process hasn't moved
    * and we haven't changed target.
    */
@@ -1341,7 +1342,7 @@ bool LLScan::ScanHeapForObjects(lldb::SBTarget target,
   if (mapstoinstances_.empty()) {
     FindJSObjectsVisitor v(target, this);
 
-    ScanMemoryRanges(v);
+    ScanMemoryRanges(v, scan);
   }
 
   return true;
@@ -1413,7 +1414,7 @@ inline static ByteOrder GetHostByteOrder() {
   return u.b == 1 ? ByteOrder::eByteOrderBig : ByteOrder::eByteOrderLittle;
 }
 
-void LLScan::ScanMemoryRanges(FindJSObjectsVisitor& v) {
+void LLScan::ScanMemoryRanges(FindJSObjectsVisitor& v, HeapScanMonitor* scan) {
   bool done = false;
 
   const uint64_t addr_size = process_.GetAddressByteSize();
@@ -1435,7 +1436,10 @@ void LLScan::ScanMemoryRanges(FindJSObjectsVisitor& v) {
   lldb::SBMemoryRegionInfoList memory_regions = process_.GetMemoryRegions();
   lldb::SBMemoryRegionInfo region_info;
 
-  for (uint32_t i = 0; i < memory_regions.GetSize(); ++i) {
+  uint32_t size = memory_regions.GetSize();
+  for (uint32_t i = 0; i < size; ++i) {
+    if(scan != nullptr)
+      scan(llnode_, i, size);
     memory_regions.GetMemoryRegionAtIndex(i, region_info);
 
     if (!region_info.IsWritable()) {
