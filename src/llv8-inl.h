@@ -420,7 +420,13 @@ inline std::string SlicedString::ToString(Error& err, bool utf16) {
   std::string tmp = parent.ToString(err, utf16);
   if (err.Fail()) return std::string();
 
-  return tmp.substr(offset.GetValue(), length.GetValue());
+  uint64_t start = offset.GetValue();
+  uint64_t end = length.GetValue();
+  if(start > tmp.length())
+    start = tmp.length() - 1;
+  if(end > tmp.length())
+    end = tmp.length() - 1;
+  return tmp.substr(start, end);
 }
 
 inline std::string ThinString::ToString(Error& err, bool utf16) {

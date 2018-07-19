@@ -2711,6 +2711,7 @@ properties_t* JSObject::InspectDictionaryX(Error& err) {
   NameDictionary dictionary(dictionary_obj);
 
   int64_t length = dictionary.Length(err);
+  if(length < 0) length = 0;
   if (err.Fail()) return nullptr;
 
   InspectOptions options;
@@ -2854,6 +2855,7 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
 
   DescriptorArray descriptors(descriptors_obj);
   int64_t own_descriptors_count = map.NumberOfOwnDescriptors(err);
+  if(own_descriptors_count < 0) own_descriptors_count = 0;
   if (err.Fail()) return nullptr;
 
   int64_t in_object_count = map.InObjectProperties(err);
