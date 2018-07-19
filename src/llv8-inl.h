@@ -429,9 +429,9 @@ inline std::string SlicedString::ToString(Error& err, bool utf16) {
                          ") from parent string 0x%016" PRIx64
                          " (length = 0x%016" PRIx64 ")",
                          raw(), off, len, parent.raw(), tmp_size);
-    return std::string(err.GetMessage());
+    return std::string();
   }
-  return tmp.substr(offset.GetValue(), length.GetValue());
+  return tmp.substr(off, len);
 }
 
 inline std::string ThinString::ToString(Error& err, bool utf16) {
