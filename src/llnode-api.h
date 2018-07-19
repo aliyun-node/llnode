@@ -55,6 +55,7 @@ public:
 
 private:
   LLNode* llnode;
+  static void HeapScanMonitorCallBack_(LLNode* llnode, uint32_t now, uint32_t total);
   bool debugger_initialized = false;
   bool core_loaded = false;
   std::unique_ptr<lldb::SBDebugger> debugger;

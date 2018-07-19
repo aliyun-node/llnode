@@ -37,7 +37,7 @@ LLNodeApi::LLNodeApi(LLNode* llnode)
     target(new SBTarget()),
     process(new SBProcess()),
     llv8(new LLV8()),
-    llscan(new LLScan(llv8.get())) {}
+    llscan(new LLScan(llv8.get(), llnode)) {}
 LLNodeApi::~LLNodeApi() {};
 
 int LLNodeApi::LoadCore() {
@@ -226,9 +226,13 @@ frame_t* LLNodeApi::GetFrameInfo(size_t thread_index, size_t frame_index) {
   }
 }
 
+void LLNodeApi::HeapScanMonitorCallBack_(LLNode* llnode, uint32_t now, uint32_t total) {
+  llnode->HeapScanMonitir(now, total);
+}
+
 bool LLNodeApi::ScanHeap() {
   SBCommandReturnObject result;
-  if (!llscan->ScanHeapForObjects(*target, result)) {
+  if (!llscan->ScanHeapForObjects(*target, result, HeapScanMonitorCallBack_)) {
     return false;
   }
   return true;
