@@ -13,8 +13,9 @@ using ::v8::Function;
 using ::v8::Array;
 
 typedef struct {
-  char* core;
-  char* executable;
+  char* core = nullptr;
+  char* executable = nullptr;
+  Nan::Persistent<Function> heap_scan_monitor;
 } core_wrap_t;
 
 template <typename T>
@@ -32,9 +33,10 @@ public:
   static void Init(Local<Object> exports);
   static void NewInstance(const Nan::FunctionCallbackInfo<Value>& info);
   core_wrap_t* GetCore();
+  void HeapScanMonitir(uint32_t now, uint32_t total);
 
 private:
-  explicit LLNode(char* core_path, char* executable_path);
+  explicit LLNode(char* core_path, char* executable_path, Local<Value> value);
   ~LLNode();
   static Nan::Persistent<Function> constructor;
   static void New(const Nan::FunctionCallbackInfo<Value>& info);
