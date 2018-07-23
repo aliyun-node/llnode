@@ -27,11 +27,7 @@ enum InspectType {
   kUnknown
 };
 
-enum FrameType {
-  kUninitializedFrame,
-  kNativeFrame,
-  kJsFrame
-};
+enum FrameType { kUninitializedFrame, kNativeFrame, kJsFrame };
 
 typedef struct Inspect {
   InspectType type;
@@ -79,7 +75,7 @@ typedef struct JSFunctionDebug {
   }
 } js_function_debug_t;
 
-typedef struct NativeFrame: frame_t {
+typedef struct NativeFrame : frame_t {
   std::string module_file = "";
   std::string compile_unit_file = "";
   ~NativeFrame() {
@@ -88,7 +84,7 @@ typedef struct NativeFrame: frame_t {
   }
 } native_frame_t;
 
-typedef struct JSFrame: frame_t {
+typedef struct JSFrame : frame_t {
   args_t* args = nullptr;
   js_function_debug_t* debug = nullptr;
   std::string address = "";
@@ -137,9 +133,7 @@ typedef struct Element {
 
 typedef struct InternalField {
   std::string address = "";
-  ~InternalField() {
-    this->address = "";
-  }
+  ~InternalField() { this->address = ""; }
 } internal_filed_t;
 
 typedef struct InternalFields {
@@ -152,14 +146,12 @@ typedef struct InternalFields {
   }
 } internal_fileds_t;
 
-typedef struct Smi: inspect_t {
+typedef struct Smi : inspect_t {
   std::string value = "";
-  ~Smi() {
-    this->value = "";
-  }
+  ~Smi() { this->value = ""; }
 } smi_t;
 
-typedef struct Map: inspect_t {
+typedef struct Map : inspect_t {
   int own_descriptors = 0;
   std::string in_object_properties_or_constructor = "";
   int in_object_properties_or_constructor_index = 0;
@@ -177,10 +169,10 @@ typedef struct Map: inspect_t {
   }
 } map_t;
 
-typedef struct FixedArray: elements_t, inspect_t {
+typedef struct FixedArray : elements_t, inspect_t {
 } fixed_array_t;
 
-typedef struct JsObject: inspect_t {
+typedef struct JsObject : inspect_t {
   std::string constructor = "";
   int64_t elements_length = 0;
   int64_t properties_length = 0;
@@ -202,14 +194,12 @@ typedef struct JsObject: inspect_t {
   }
 } js_object_t;
 
-typedef struct HeapNumber: inspect_t {
+typedef struct HeapNumber : inspect_t {
   std::string value = "";
-  ~HeapNumber() {
-    this->value = "";
-  }
+  ~HeapNumber() { this->value = ""; }
 } heap_number_t;
 
-typedef struct JsArray: inspect_t {
+typedef struct JsArray : inspect_t {
   int total_length = 0;
   elements_t* display_elemets = nullptr;
   ~JsArray() {
@@ -219,14 +209,12 @@ typedef struct JsArray: inspect_t {
   }
 } js_array_t;
 
-typedef struct Oddball: inspect_t {
+typedef struct Oddball : inspect_t {
   std::string value = "";
-  ~Oddball() {
-    this->value = "";
-  }
+  ~Oddball() { this->value = ""; }
 } oddball_t;
 
-typedef struct JsFunction: inspect_t {
+typedef struct JsFunction : inspect_t {
   std::string func_name = "";
   std::string func_source = "";
   std::string debug_line = "";
@@ -242,7 +230,7 @@ typedef struct JsFunction: inspect_t {
   }
 } js_function_t;
 
-typedef struct Context: inspect_t {
+typedef struct Context : inspect_t {
   std::string previous_address = "";
   std::string closure_address = "";
   inspect_t* closure = nullptr;
@@ -257,7 +245,7 @@ typedef struct Context: inspect_t {
   }
 } context_t;
 
-typedef struct JsRegexp: inspect_t {
+typedef struct JsRegexp : inspect_t {
   std::string source = "";
   elements_t* elements = nullptr;
   properties_t* properties = nullptr;
@@ -270,7 +258,7 @@ typedef struct JsRegexp: inspect_t {
   }
 } js_regexp_t;
 
-typedef struct FirstNonString: inspect_t {
+typedef struct FirstNonString : inspect_t {
   int total_length = 0;
   std::string display_value = "";
   int current = 0;
@@ -283,7 +271,7 @@ typedef struct FirstNonString: inspect_t {
   }
 } first_non_string_t;
 
-typedef struct JsArrayBuffer: inspect_t {
+typedef struct JsArrayBuffer : inspect_t {
   // if true, show "[neutered]"
   bool neutered = false;
   int byte_length = 0;
@@ -302,7 +290,7 @@ typedef struct JsArrayBuffer: inspect_t {
   }
 } js_array_buffer_t;
 
-typedef struct JsArrayBufferView: inspect_t {
+typedef struct JsArrayBufferView : inspect_t {
   // if true, show "[neutered]"
   bool neutered = false;
   int byte_length = 0;
@@ -323,22 +311,21 @@ typedef struct JsArrayBufferView: inspect_t {
   }
 } js_array_buffer_view_t;
 
-typedef struct JsDate: inspect_t {
+typedef struct JsDate : inspect_t {
   std::string value = "";
-  ~JsDate() {
-    this->value = "";
-  }
+  ~JsDate() { this->value = ""; }
 } js_date_t;
 
 class LLMonitor {
-public:
+ public:
   explicit LLMonitor();
   ~LLMonitor();
   void SetProgress(double progress);
   double GetProgress();
-private:
+
+ private:
   double progress;
 };
-}
+}  // namespace llnode
 
 #endif

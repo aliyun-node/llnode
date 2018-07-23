@@ -4,9 +4,9 @@
 #include <cinttypes>
 #include <cstdarg>
 
+#include "llnode-api.h"
 #include "llv8-inl.h"
 #include "llv8.h"
-#include "llnode-api.h"
 
 namespace llnode {
 namespace v8 {
@@ -132,7 +132,8 @@ std::string LLV8::LoadBytes(int64_t addr, int64_t length, Error& err) {
   return res;
 }
 
-std::string* LLV8::LoadBytesX(int64_t addr, int64_t length, int64_t start, int64_t end, Error& err) {
+std::string* LLV8::LoadBytesX(int64_t addr, int64_t length, int64_t start,
+                              int64_t end, Error& err) {
   uint8_t* buf = new uint8_t[length + 1];
   SBError sberr;
   process_.ReadMemory(addr, buf, static_cast<size_t>(length), sberr);
@@ -233,16 +234,17 @@ std::string LLV8::Utf16ToUtf8(const std::u16string& u16_str) {
   return u8_str;
 }
 
-std::string LLV8::LoadTwoByteString(int64_t addr, int64_t length, Error& err, bool utf16) {
+std::string LLV8::LoadTwoByteString(int64_t addr, int64_t length, Error& err,
+                                    bool utf16) {
   if (length < 0) {
     err = Error::Failure("Failed to load V8 two byte string - Invalid length");
     return std::string();
   }
 
   // get source code / debug line needs origin utf16 string, although it
-  // will display wrong when the string contains characters that require 
+  // will display wrong when the string contains characters that require
   // two bytes to represented
-  if(utf16) {
+  if (utf16) {
     char* buf = new char[2 * length + 1];
     SBError sberr;
     process_.ReadMemory(static_cast<addr_t>(addr), buf,
@@ -255,8 +257,7 @@ std::string LLV8::LoadTwoByteString(int64_t addr, int64_t length, Error& err, bo
       delete[] buf;
       return std::string();
     }
-    for(int64_t i = 0; i <  length; i++)
-      buf[i] =  buf[i * 2];
+    for (int64_t i = 0; i < length; i++) buf[i] = buf[i * 2];
     buf[length] = '\0';
     std::string res = buf;
     delete[] buf;
@@ -278,7 +279,7 @@ std::string LLV8::LoadTwoByteString(int64_t addr, int64_t length, Error& err, bo
   }
   std::string res = Utf16ToUtf8(buf);
   delete[] buf;
-  if(err.Fail()) {
+  if (err.Fail()) {
     return std::string();
   }
   err = Error::Ok();
@@ -565,7 +566,7 @@ args_t* JSFrame::InspectArgsX(JSFunction fn, Error& err) {
   args->length = param_count;
   try {
     args->args_list = new inspect_t*[param_count];
-  } catch(std::bad_alloc) {
+  } catch (std::bad_alloc) {
     delete args;
     return nullptr;
   }
@@ -1158,13 +1159,13 @@ std::string HeapObject::Inspect(InspectOptions* options, Error& err) {
   if (options->print_map) {
     HeapObject map = GetMap(err);
     if (err.Fail()) return std::string();
-    if(options->start_address != raw()) {
-      snprintf(buf, sizeof(buf), "(map=0x%016" PRIx64 "):" ,map.raw());
+    if (options->start_address != raw()) {
+      snprintf(buf, sizeof(buf), "(map=0x%016" PRIx64 "):", map.raw());
     } else {
-      snprintf(buf, sizeof(buf), "0x%016" PRIx64 "(map=0x%016" PRIx64 "):", raw(),
-      map.raw());
+      snprintf(buf, sizeof(buf),
+               "0x%016" PRIx64 "(map=0x%016" PRIx64 "):", raw(), map.raw());
     }
-  } else if(options->start_address != raw()) {
+  } else if (options->start_address != raw()) {
     snprintf(buf, sizeof(buf), "0x%016" PRIx64 ":", raw());
   } else {
     snprintf(buf, sizeof(buf), "");
@@ -1286,7 +1287,7 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (JSObject::IsObjectType(v8(), type)) {
     JSObject o(this);
     js_object_t* js_object = o.InspectX(options, err);
-    if(js_object == nullptr) {
+    if (js_object == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1298,8 +1299,8 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
 
   if (type == v8()->types()->kHeapNumberType) {
     HeapNumber n(this);
-    heap_number_t* heap_number =  n.InspectX(err);
-    if(heap_number == nullptr) {
+    heap_number_t* heap_number = n.InspectX(err);
+    if (heap_number == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1312,7 +1313,7 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSArrayType) {
     JSArray arr(this);
     js_array_t* js_array = arr.InspectX(options, err);
-    if(js_array == nullptr) {
+    if (js_array == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1324,8 +1325,8 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
 
   if (type == v8()->types()->kOddballType) {
     Oddball o(this);
-    oddball_t* oddball =  o.InspectX(err);
-    if(oddball == nullptr) {
+    oddball_t* oddball = o.InspectX(err);
+    if (oddball == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1337,8 +1338,8 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
 
   if (type == v8()->types()->kJSFunctionType) {
     JSFunction fn(this);
-    js_function_t* js_function =  fn.InspectX(options, err);
-    if(js_function == nullptr) {
+    js_function_t* js_function = fn.InspectX(options, err);
+    if (js_function == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1351,7 +1352,7 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSRegExpType) {
     JSRegExp re(this);
     inspect_t* js_regexp = re.InspectX(options, err);
-    if(js_regexp == nullptr) {
+    if (js_regexp == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1364,7 +1365,7 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type < v8()->types()->kFirstNonstringType) {
     String str(this);
     first_non_string_t* string = str.InspectX(options, err);
-    if(string == nullptr) {
+    if (string == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1377,7 +1378,7 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kFixedArrayType) {
     FixedArray arr(this);
     fixed_array_t* fixed_array = arr.InspectX(options, err);
-    if(fixed_array == nullptr) {
+    if (fixed_array == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1390,7 +1391,7 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSArrayBufferType) {
     JSArrayBuffer buf(this);
     js_array_buffer_t* array_buffer = buf.InspectX(options, err);
-    if(array_buffer == nullptr) {
+    if (array_buffer == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1403,7 +1404,7 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSTypedArrayType) {
     JSArrayBufferView view(this);
     js_array_buffer_view_t* array_buffer_view = view.InspectX(options, err);
-    if(array_buffer_view == nullptr) {
+    if (array_buffer_view == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1416,7 +1417,7 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   if (type == v8()->types()->kJSDateType) {
     JSDate date(this);
     js_date_t* js_date = date.InspectX(err);
-    if(js_date == nullptr) {
+    if (js_date == nullptr) {
       delete inspect;
       return nullptr;
     }
@@ -1580,7 +1581,8 @@ std::string String::ToString(Error& err, bool utf16) {
 
   if (repr == v8()->string()->kConsStringTag) {
     ConsString cons(this);
-    return cons.ToString(err, utf16);;
+    return cons.ToString(err, utf16);
+    ;
   }
 
   if (repr == v8()->string()->kSlicedStringTag) {
@@ -1611,13 +1613,15 @@ std::string String::Inspect(InspectOptions* options, Error& err) {
   int total_length = val.length();
   if (len != 0 && val.length() > len) val = val.substr(0, len) + "...";
 
-  return "<String \"" + val + "\", length=" + std::to_string(total_length) + ">";
+  return "<String \"" + val + "\", length=" + std::to_string(total_length) +
+         ">";
 }
 
-unsigned long String::GetSubStr(unsigned long current, int limit, std::string val) {
+unsigned long String::GetSubStr(unsigned long current, int limit,
+                                std::string val) {
   unsigned long curt = current + limit;
   int next = val[curt] - 0xFFFFFF00;
-  if( val.length() > curt + 1 && next < 192 && next > 127) {
+  if (val.length() > curt + 1 && next < 192 && next > 127) {
     return GetSubStr(current, limit + 1, val);
   } else {
     return limit;
@@ -1633,17 +1637,17 @@ first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
   string->total_length = val.length();
 
   unsigned int len = options->length;
-  if(options->current > val.length() - 1) {
+  if (options->current > val.length() - 1) {
     string->end = true;
     string->current = val.length() - 1;
     val = "";
   } else if (options->current != 0 && options->limit != 0) {
     int option_current = options->current;
-    if(option_current < 0) option_current = 0;
+    if (option_current < 0) option_current = 0;
     int option_limit = options->limit;
-    if(option_limit < 0) option_limit = 0;
+    if (option_limit < 0) option_limit = 0;
     unsigned int next_current = option_current + option_limit;
-    if(val.length() > next_current) {
+    if (val.length() > next_current) {
       unsigned long limit = GetSubStr(option_current, option_limit, val);
       val = val.substr(option_current, limit) + "...";
       string->current = option_current + limit;
@@ -1850,7 +1854,7 @@ context_t* Context::InspectX(Error& err) {
     context->closure_address = tmp;
 
     InspectOptions options;
-    context->closure =  closure.InspectX(&options, err);
+    context->closure = closure.InspectX(&options, err);
     if (err.Fail()) {
       delete context;
       return nullptr;
@@ -1874,7 +1878,7 @@ context_t* Context::InspectX(Error& err) {
 
     property_t* object = new property_t;
     object_list[i] = object;
-    object->key =  name.ToString(err);
+    object->key = name.ToString(err);
     if (err.Fail()) {
       delete context;
       return nullptr;
@@ -1927,7 +1931,8 @@ oddball_t* Oddball::InspectX(Error& err) {
   if (kind_val == v8()->oddball()->kUndefined) oddball->value = "undefined";
   if (kind_val == v8()->oddball()->kNull) oddball->value = "null";
   if (kind_val == v8()->oddball()->kTheHole) oddball->value = "<hole>";
-  if (kind_val == v8()->oddball()->kUninitialized) oddball->value = "<uninitialized>";
+  if (kind_val == v8()->oddball()->kUninitialized)
+    oddball->value = "<uninitialized>";
 
   return oddball;
 }
@@ -1970,7 +1975,8 @@ std::string JSArrayBuffer::Inspect(InspectOptions* options, Error& err) {
   return res;
 }
 
-js_array_buffer_t* JSArrayBuffer::InspectX(InspectOptions* options, Error& err) {
+js_array_buffer_t* JSArrayBuffer::InspectX(InspectOptions* options,
+                                           Error& err) {
   bool neutered = WasNeutered(err);
   if (err.Fail()) return nullptr;
 
@@ -2004,17 +2010,18 @@ js_array_buffer_t* JSArrayBuffer::InspectX(InspectOptions* options, Error& err) 
 
   if (options->detailed) {
     int option_current = options->current;
-    if(option_current < 0) option_current = 0;
+    if (option_current < 0) option_current = 0;
     int option_limit = options->limit;
-    if(option_limit < 0) option_limit = 0;
+    if (option_limit < 0) option_limit = 0;
     int64_t start = option_current;
-    if(start >= byte_length) start = byte_length;
+    if (start >= byte_length) start = byte_length;
     int64_t end = byte_length;
-    if(option_limit != 0) end = option_current + option_limit;
-    if(end >= byte_length) end = byte_length;
+    if (option_limit != 0) end = option_current + option_limit;
+    if (end >= byte_length) end = byte_length;
     array_buffer->current = end;
     array_buffer->display_length = end - start;
-    array_buffer->elements = v8()->LoadBytesX(data, byte_length, start, end, err);
+    array_buffer->elements =
+        v8()->LoadBytesX(data, byte_length, start, end, err);
   } else {
     array_buffer->elements = nullptr;
   }
@@ -2079,7 +2086,8 @@ std::string JSArrayBufferView::Inspect(InspectOptions* options, Error& err) {
   return res;
 }
 
-js_array_buffer_view_t* JSArrayBufferView::InspectX(InspectOptions* options, Error& err) {
+js_array_buffer_view_t* JSArrayBufferView::InspectX(InspectOptions* options,
+                                                    Error& err) {
   JSArrayBuffer buf = Buffer(err);
   if (err.Fail()) return nullptr;
 
@@ -2143,19 +2151,20 @@ js_array_buffer_view_t* JSArrayBufferView::InspectX(InspectOptions* options, Err
   snprintf(tmp, sizeof(tmp), "0x%016" PRIx64, data);
   array_buffer_view->backing_store_address = tmp;
 
-  if(options->detailed) {
+  if (options->detailed) {
     int option_current = options->current;
-    if(option_current < 0) option_current = 0;
+    if (option_current < 0) option_current = 0;
     int option_limit = options->limit;
-    if(option_limit < 0) option_limit = 0;
+    if (option_limit < 0) option_limit = 0;
     int64_t start = option_current;
-    if(start >= byte_length) start = byte_length;
+    if (start >= byte_length) start = byte_length;
     int64_t end = byte_length;
-    if(option_limit != 0) end = option_current + option_limit;
-    if(end >= byte_length) end = byte_length;
+    if (option_limit != 0) end = option_current + option_limit;
+    if (end >= byte_length) end = byte_length;
     array_buffer_view->current = end;
     array_buffer_view->display_length = end - start;
-    array_buffer_view->elements = v8()->LoadBytesX(data + byte_offset, byte_length, start, end, err);
+    array_buffer_view->elements =
+        v8()->LoadBytesX(data + byte_offset, byte_length, start, end, err);
   } else {
     array_buffer_view->elements = nullptr;
   }
@@ -2230,8 +2239,10 @@ map_t* Map::InspectX(InspectOptions* options, Error& err) {
   map->type = kMap;
   map->name = "Map";
   map->own_descriptors = static_cast<int>(own_descriptors_count);
-  map->in_object_properties_or_constructor = in_object_properties_or_constructor;
-  map->in_object_properties_or_constructor_index = static_cast<int>(in_object_properties_or_constructor_index);
+  map->in_object_properties_or_constructor =
+      in_object_properties_or_constructor;
+  map->in_object_properties_or_constructor_index =
+      static_cast<int>(in_object_properties_or_constructor_index);
   map->instance_size = static_cast<int>(instance_size);
   char tmp[64];
   snprintf(tmp, sizeof(tmp), "0x%016" PRIx64, descriptors_obj.raw());
@@ -2455,8 +2466,7 @@ internal_fileds_t* JSObject::InspectInternalFieldsX(Error& err) {
     snprintf(tmp, sizeof(tmp), "    0x%016" PRIx64, field);
     internal_filed_t* tmp2 = new internal_filed_t;
     tmp2->address = tmp;
-    if(i < length)
-      fieldtmp[i++] = tmp2;
+    if (i < length) fieldtmp[i++] = tmp2;
   }
 
   return fields;
@@ -2596,7 +2606,8 @@ std::string JSObject::InspectElements(int64_t length, Error& err) {
   return res;
 }
 
-elements_t* JSObject::InspectElementsX(int64_t length, Error& err, int64_t current, int64_t limit) {
+elements_t* JSObject::InspectElementsX(int64_t length, Error& err,
+                                       int64_t current, int64_t limit) {
   HeapObject elements_obj = Elements(err);
   if (err.Fail()) return nullptr;
   FixedArray elements(elements_obj);
@@ -2604,10 +2615,10 @@ elements_t* JSObject::InspectElementsX(int64_t length, Error& err, int64_t curre
   InspectOptions options;
 
   int64_t start = current;
-  if(start >= length) start = length;
+  if (start >= length) start = length;
   int64_t end = length;
-  if(limit != 0) end = current + limit;
-  if(end >= length) end = length;
+  if (limit != 0) end = current + limit;
+  if (end >= length) end = length;
   elements_t* elementstmp = new elements_t;
   inspect_t** element = new inspect_t*[end - start];
   elementstmp->length = static_cast<int>(end - start);
@@ -2711,7 +2722,7 @@ properties_t* JSObject::InspectDictionaryX(Error& err) {
   NameDictionary dictionary(dictionary_obj);
 
   int64_t length = dictionary.Length(err);
-  if(length < 0) length = 0;
+  if (length < 0) length = 0;
   if (err.Fail()) return nullptr;
 
   InspectOptions options;
@@ -2855,7 +2866,7 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
 
   DescriptorArray descriptors(descriptors_obj);
   int64_t own_descriptors_count = map.NumberOfOwnDescriptors(err);
-  if(own_descriptors_count < 0) own_descriptors_count = 0;
+  if (own_descriptors_count < 0) own_descriptors_count = 0;
   if (err.Fail()) return nullptr;
 
   int64_t in_object_count = map.InObjectProperties(err);
@@ -2960,7 +2971,8 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
     }
   }
 
-  return properties;;
+  return properties;
+  ;
 }
 
 
@@ -3397,10 +3409,11 @@ js_array_t* JSArray::InspectX(InspectOptions* options, Error& err) {
   if (options->detailed) {
     // int64_t display_length = std::min<int64_t>(length, options->length);
     int option_current = options->current;
-    if(option_current < 0) option_current = 0;
+    if (option_current < 0) option_current = 0;
     int option_limit = options->limit;
-    if(option_limit < 0) option_limit = 0;
-    js_array->display_elemets = InspectElementsX(length, err, option_current, option_limit);
+    if (option_limit < 0) option_limit = 0;
+    js_array->display_elemets =
+        InspectElementsX(length, err, option_current, option_limit);
     if (err.Fail()) {
       delete js_array;
       return nullptr;

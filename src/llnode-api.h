@@ -1,9 +1,9 @@
 #ifndef SRC_LLNODE_API_H
 #define SRC_LLNODE_API_H
 
-#include <vector>
-#include <unordered_map>
 #include <cinttypes>
+#include <unordered_map>
+#include <vector>
 
 #include "src/llnode-common.h"
 
@@ -11,7 +11,7 @@ namespace lldb {
 class SBDebugger;
 class SBTarget;
 class SBProcess;
-}
+}  // namespace lldb
 
 namespace llnode {
 class LLNode;
@@ -27,7 +27,7 @@ typedef std::unordered_map<std::string, inspect_t*> InspectMap;
 typedef std::unordered_map<std::string, std::string**> InstancesMap;
 
 class LLNodeApi {
-public:
+ public:
   LLNodeApi(LLNode* llnode);
   ~LLNodeApi();
   int LoadCore();
@@ -51,11 +51,13 @@ public:
   uint32_t GetTypeTotalSize(size_t type_index, int type = 0);
   std::string** GetTypeInstances(size_t type_index, int type = 0);
   std::string GetObject(uint64_t address, bool detailed);
-  inspect_t* Inspect(uint64_t address, bool detailed, unsigned int current = 0, unsigned int limit = 0);
+  inspect_t* Inspect(uint64_t address, bool detailed, unsigned int current = 0,
+                     unsigned int limit = 0);
 
-private:
+ private:
   LLNode* llnode;
-  static void HeapScanMonitorCallBack_(LLNode* llnode, uint32_t now, uint32_t total);
+  static void HeapScanMonitorCallBack_(LLNode* llnode, uint32_t now,
+                                       uint32_t total);
   bool debugger_initialized = false;
   bool core_loaded = false;
   std::unique_ptr<lldb::SBDebugger> debugger;
@@ -69,6 +71,6 @@ private:
   InspectMap inspect_map;
   InstancesMap instances_map;
 };
-}
+}  // namespace llnode
 
 #endif

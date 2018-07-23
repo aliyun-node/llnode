@@ -6,11 +6,11 @@
 #include "src/llnode-api.h"
 
 namespace llnode {
+using ::v8::Array;
+using ::v8::Function;
 using ::v8::Local;
 using ::v8::Object;
 using ::v8::Value;
-using ::v8::Function;
-using ::v8::Array;
 
 typedef struct {
   char* core = nullptr;
@@ -24,18 +24,19 @@ struct pagination_t {
   T end;
 };
 template <typename T>
-pagination_t<T>* GetPagination(Local<Value> in_curt, Local<Value> in_limt, T length);
+pagination_t<T>* GetPagination(Local<Value> in_curt, Local<Value> in_limt,
+                               T length);
 template <typename T>
 Local<Array> GetDisPlayElements(T* eles);
 
 class LLNode : public Nan::ObjectWrap {
-public:
+ public:
   static void Init(Local<Object> exports);
   static void NewInstance(const Nan::FunctionCallbackInfo<Value>& info);
   core_wrap_t* GetCore();
   void HeapScanMonitir(uint32_t now, uint32_t total);
 
-private:
+ private:
   explicit LLNode(char* core_path, char* executable_path, Local<Value> value);
   ~LLNode();
   static Nan::Persistent<Function> constructor;
@@ -45,8 +46,10 @@ private:
   static void GetThreadByIds(const Nan::FunctionCallbackInfo<Value>& info);
   static void GetJsObjects(const Nan::FunctionCallbackInfo<Value>& info);
   static void GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info);
-  static void InspectJsObjectAtAddress(const Nan::FunctionCallbackInfo<Value>& info);
-  Local<Object> GetThreadInfoById(size_t thread_index, size_t curt, size_t limt, bool limit_is_number);
+  static void InspectJsObjectAtAddress(
+      const Nan::FunctionCallbackInfo<Value>& info);
+  Local<Object> GetThreadInfoById(size_t thread_index, size_t curt, size_t limt,
+                                  bool limit_is_number);
   Local<Object> InspectJsObject(inspect_t* inspect);
   Local<Array> GetProperties(properties_t* props);
   Local<Array> GetElements(elements_t* eles);
@@ -59,6 +62,6 @@ private:
   // lazy heap scanning
   bool heap_initialized = false;
 };
-}
+}  // namespace llnode
 
 #endif

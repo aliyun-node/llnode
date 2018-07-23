@@ -1438,8 +1438,7 @@ void LLScan::ScanMemoryRanges(FindJSObjectsVisitor& v, HeapScanMonitor* scan) {
 
   uint32_t size = memory_regions.GetSize();
   for (uint32_t i = 0; i < size; ++i) {
-    if(scan != nullptr)
-      scan(llnode_, i, size);
+    if (scan != nullptr) scan(llnode_, i, size);
     memory_regions.GetMemoryRegionAtIndex(i, region_info);
 
     if (!region_info.IsWritable()) {
