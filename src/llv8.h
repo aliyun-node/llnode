@@ -7,8 +7,8 @@
 #include <lldb/API/LLDB.h>
 
 #include "src/error.h"
-#include "src/llv8-constants.h"
 #include "src/llnode-common.h"
+#include "src/llv8-constants.h"
 
 namespace llnode {
 
@@ -24,30 +24,27 @@ class FindObjectsCmd;
 
 namespace v8 {
 
-typedef unsigned int    UTF32;  /* at least 32 bits */
-typedef unsigned short  UTF16;  /* at least 16 bits */
-typedef unsigned char   UTF8;   /* typically 8 bits */
+typedef unsigned int UTF32;   /* at least 32 bits */
+typedef unsigned short UTF16; /* at least 16 bits */
+typedef unsigned char UTF8;   /* typically 8 bits */
 
-typedef enum {
-  strictConversion = 0,
-  lenientConversion
-} ConversionFlags;
+typedef enum { strictConversion = 0, lenientConversion } ConversionFlags;
 
-#define UNI_SUR_HIGH_START  (UTF32)0xD800
-#define UNI_SUR_HIGH_END    (UTF32)0xDBFF
-#define UNI_SUR_LOW_START   (UTF32)0xDC00
-#define UNI_SUR_LOW_END     (UTF32)0xDFFF
+#define UNI_SUR_HIGH_START (UTF32)0xD800
+#define UNI_SUR_HIGH_END (UTF32)0xDBFF
+#define UNI_SUR_LOW_START (UTF32)0xDC00
+#define UNI_SUR_LOW_END (UTF32)0xDFFF
 
 #define UNI_REPLACEMENT_CHAR (UTF32)0x0000FFFD
 
 #define UNI_MAX_UTF8_BYTES_PER_CODE_POINT 4
 
-#define UNI_UTF16_BYTE_ORDER_MARK_NATIVE  0xFEFF
+#define UNI_UTF16_BYTE_ORDER_MARK_NATIVE 0xFEFF
 #define UNI_UTF16_BYTE_ORDER_MARK_SWAPPED 0xFFFE
 
-static const UTF8 firstByteMark[7] = { 0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC };
+static const UTF8 firstByteMark[7] = {0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC};
 
-static const int halfShift  = 10; /* used for shifting by 10 bits */
+static const int halfShift = 10; /* used for shifting by 10 bits */
 
 static const UTF32 halfBase = 0x0010000UL;
 
@@ -297,7 +294,8 @@ class JSObject : public HeapObject {
   elements_t* InspectElementsX(Error& err);
   int64_t GetElementsLength(Error& err);
   std::string InspectElements(int64_t length, Error& err);
-  elements_t* InspectElementsX(int64_t length, Error& err, int64_t current = 0, int64_t limit = 0);
+  elements_t* InspectElementsX(int64_t length, Error& err, int64_t current = 0,
+                               int64_t limit = 0);
   std::string InspectDictionary(Error& err);
   int64_t GetPropertiesLength(Error& err);
   properties_t* InspectDictionaryX(Error& err);
@@ -533,9 +531,11 @@ class LLV8 {
   int64_t LoadUnsigned(int64_t addr, uint32_t byte_size, Error& err);
   double LoadDouble(int64_t addr, Error& err);
   std::string LoadBytes(int64_t addr, int64_t length, Error& err);
-  std::string* LoadBytesX(int64_t addr, int64_t length, int64_t start, int64_t end, Error& err);
+  std::string* LoadBytesX(int64_t addr, int64_t length, int64_t start,
+                          int64_t end, Error& err);
   std::string LoadString(int64_t addr, int64_t length, Error& err);
-  std::string LoadTwoByteString(int64_t addr, int64_t length, Error& err, bool utf16 = false);
+  std::string LoadTwoByteString(int64_t addr, int64_t length, Error& err,
+                                bool utf16 = false);
   std::string Utf16ToUtf8(const std::u16string& u16_str);
   uint8_t* LoadChunk(int64_t addr, int64_t length, Error& err);
 
