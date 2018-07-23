@@ -1,5 +1,5 @@
-#ifndef SRC_NODE_H_
-#define SRC_NODE_H_
+#ifndef SRC_LLNODE_NODE_H_
+#define SRC_LLNODE_NODE_H_
 
 #include <lldb/API/LLDB.h>
 #include <list>
