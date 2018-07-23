@@ -9,8 +9,7 @@
 
 namespace llnode {
 
-class CommandBase : public lldb::SBCommandPluginInterface {
-};
+class CommandBase : public lldb::SBCommandPluginInterface {};
 
 class BacktraceCmd : public CommandBase {
  public:

@@ -6,8 +6,8 @@
 #include <set>
 
 #include "src/error.h"
-#include "src/llnode.h"
 #include "src/llnode-module.h"
+#include "src/llnode.h"
 
 namespace llnode {
 
@@ -19,7 +19,7 @@ typedef std::map<uint64_t, ReferencesVector*> ReferencesByValueMap;
 typedef std::map<std::string, ReferencesVector*> ReferencesByPropertyMap;
 typedef std::map<std::string, ReferencesVector*> ReferencesByStringMap;
 
-typedef void (HeapScanMonitor)(LLNode* llnode, uint32_t now, uint32_t total);
+typedef void(HeapScanMonitor)(LLNode* llnode, uint32_t now, uint32_t total);
 
 char** ParseInspectOptions(char** cmd, v8::Value::InspectOptions* options);
 
@@ -299,7 +299,8 @@ class FindJSObjectsVisitor : MemoryVisitor {
 
 class LLScan {
  public:
-  LLScan(v8::LLV8* llv8, LLNode* llnode = nullptr) : llv8_(llv8), llnode_(llnode) {}
+  LLScan(v8::LLV8* llv8, LLNode* llnode = nullptr)
+      : llv8_(llv8), llnode_(llnode) {}
 
   v8::LLV8* v8() { return llv8_; }
 
@@ -349,7 +350,8 @@ class LLScan {
   LLNode* llnode_;
 
  private:
-  void ScanMemoryRanges(FindJSObjectsVisitor& v, HeapScanMonitor* scan = nullptr);
+  void ScanMemoryRanges(FindJSObjectsVisitor& v,
+                        HeapScanMonitor* scan = nullptr);
   void ClearMemoryRanges();
   void ClearMapsToInstances();
   void ClearReferences();
