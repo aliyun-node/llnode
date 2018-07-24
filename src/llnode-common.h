@@ -170,6 +170,8 @@ typedef struct Map : inspect_t {
 } map_t;
 
 typedef struct FixedArray : elements_t, inspect_t {
+  int total_length = 0;
+  ~FixedArray() { this->total_length = 0; }
 } fixed_array_t;
 
 typedef struct JsObject : inspect_t {
