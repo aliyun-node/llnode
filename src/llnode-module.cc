@@ -354,10 +354,21 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
     }
     case InspectType::kFixedArray: {
       fixed_array_t* fixed_array = static_cast<fixed_array_t*>(inspect);
-      result->Set(Nan::New<String>("length").ToLocalChecked(),
-                  Nan::New<Number>(fixed_array->length));
-      result->Set(Nan::New<String>("array").ToLocalChecked(),
-                  GetElements(fixed_array));
+      if (fixed_array != nullptr) {
+        result->Set(Nan::New<String>("total_length").ToLocalChecked(),
+                    Nan::New<Number>(fixed_array->total_length));
+        result->Set(Nan::New<String>("current").ToLocalChecked(),
+                    Nan::New<Number>(fixed_array->current));
+        result->Set(Nan::New<String>("display_array").ToLocalChecked(),
+                    GetElements(fixed_array));
+      } else {
+        result->Set(Nan::New<String>("total_length").ToLocalChecked(),
+                    Nan::New<Number>(0));
+        result->Set(Nan::New<String>("current").ToLocalChecked(),
+                    Nan::New<Number>(0));
+        result->Set(Nan::New<String>("display_array").ToLocalChecked(),
+                    Nan::New<Array>(0));
+      }
       break;
     }
     case InspectType::kJsObject: {

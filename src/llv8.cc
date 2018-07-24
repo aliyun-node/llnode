@@ -1695,17 +1695,29 @@ fixed_array_t* FixedArray::InspectX(InspectOptions* options, Error& err) {
   fixed_array_t* fixed_array = new fixed_array_t;
   fixed_array->type = kFixedArray;
   fixed_array->name = "FixedArray";
-  fixed_array->length = length_smi.GetValue();
+  int64_t total_length = length_smi.GetValue();
+  fixed_array->total_length = total_length;
   if (options->detailed) {
+    int option_current = options->current;
+    if (option_current < 0) option_current = 0;
+    int option_limit = options->limit;
+    if (option_limit < 0) option_limit = 0;
+    int64_t start = option_current;
+    if (start >= total_length) start = total_length;
+    int64_t end = total_length;
+    if (option_limit != 0) end = option_current + option_limit;
+    if (end >= total_length) end = total_length;
+    fixed_array->current = end;
+    fixed_array->length = end - start;
     fixed_array->elements = new inspect_t*[fixed_array->length];
     InspectOptions opt;
-    for (int i = 0; i < fixed_array->length; ++i) {
+    for (int64_t i = start; i < end; ++i) {
       Value value = Get<Value>(i, err);
       if (err.Fail()) {
         delete fixed_array;
         return nullptr;
       }
-      fixed_array->elements[i] = value.InspectX(&opt, err);
+      fixed_array->elements[i - start] = value.InspectX(&opt, err);
       if (err.Fail()) {
         delete fixed_array;
         return nullptr;
