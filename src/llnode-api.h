@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <memory>
 #include "src/llnode-common.h"
 
 namespace lldb {
