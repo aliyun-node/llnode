@@ -2354,36 +2354,103 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
   js_object->fields_length = GetFieldsLength(err);
 
   if (options->detailed) {
+    int option_current = options->current;
+    if (option_current < 0) option_current = 0;
+    int option_limit = options->limit;
+    if (option_limit < 0) option_limit = 0;
+    int option_end = option_current + option_limit;
+
     // add elements
-    js_object->elements = InspectElementsX(err);
-    if (err.Fail()) {
-      delete js_object;
-      return nullptr;
+    if (option_current < js_object->elements_length) {
+      js_object->elements = InspectElementsX(err, option_current, option_limit);
+      if (err.Fail()) {
+        delete js_object;
+        return nullptr;
+      }
+    } else {
+      js_object->elements = nullptr;
     }
 
     // add properties
-    HeapObject map_obj = GetMap(err);
-    if (err.Fail()) {
-      delete js_object;
-      return nullptr;
-    }
-    Map map(map_obj);
-    bool is_dict = map.IsDictionary(err);
-    if (err.Fail()) {
-      delete js_object;
-      return nullptr;
-    }
-    if (is_dict)
-      js_object->properties = InspectDictionaryX(err);
-    else
-      js_object->properties = InspectDescriptorsX(map, err);
-    if (err.Fail()) {
-      delete js_object;
-      return nullptr;
+    if (option_current >= js_object->elements_length &&
+        option_current <
+            js_object->elements_length + js_object->properties_length) {
+      HeapObject map_obj = GetMap(err);
+      if (err.Fail()) {
+        delete js_object;
+        return nullptr;
+      }
+      Map map(map_obj);
+      bool is_dict = map.IsDictionary(err);
+      if (err.Fail()) {
+        delete js_object;
+        return nullptr;
+      }
+      if (is_dict)
+        js_object->properties = InspectDictionaryX(
+            err, option_current - js_object->elements_length, option_limit);
+      else
+        js_object->properties = InspectDescriptorsX(
+            map, err, option_current - js_object->elements_length,
+            option_limit);
+      if (err.Fail()) {
+        delete js_object;
+        return nullptr;
+      }
+    } else if (option_current < js_object->elements_length &&
+               option_end >= js_object->elements_length &&
+               option_end <
+                   js_object->elements_length + js_object->properties_length) {
+      HeapObject map_obj = GetMap(err);
+      if (err.Fail()) {
+        delete js_object;
+        return nullptr;
+      }
+      Map map(map_obj);
+      bool is_dict = map.IsDictionary(err);
+      if (err.Fail()) {
+        delete js_object;
+        return nullptr;
+      }
+      if (is_dict)
+        js_object->properties =
+            InspectDictionaryX(err, 0, option_end - js_object->elements_length);
+      else
+        js_object->properties = InspectDescriptorsX(
+            map, err, 0, option_end - js_object->elements_length);
+      if (err.Fail()) {
+        delete js_object;
+        return nullptr;
+      }
+    } else {
+      js_object->properties = nullptr;
     }
 
     // add internal fields
-    js_object->fields = InspectInternalFieldsX(err);
+    if (option_current >=
+            js_object->elements_length + js_object->properties_length &&
+        option_current < js_object->elements_length +
+                             js_object->properties_length +
+                             js_object->fields_length) {
+      js_object->fields =
+          InspectInternalFieldsX(err,
+                                 option_current - js_object->elements_length -
+                                     js_object->properties_length,
+                                 option_limit);
+    } else if (option_current <
+                   js_object->elements_length + js_object->properties_length &&
+               option_end >=
+                   js_object->elements_length + js_object->properties_length &&
+               option_end < js_object->elements_length +
+                                js_object->properties_length +
+                                js_object->fields_length) {
+      js_object->fields =
+          InspectInternalFieldsX(err, 0,
+                                 option_end - js_object->elements_length -
+                                     js_object->properties_length);
+    } else {
+      js_object->fields = nullptr;
+    }
     if (err.Fail()) {
       delete js_object;
       return nullptr;
@@ -2433,7 +2500,8 @@ std::string JSObject::InspectInternalFields(Error& err) {
   return res;
 }
 
-internal_fileds_t* JSObject::InspectInternalFieldsX(Error& err) {
+internal_fileds_t* JSObject::InspectInternalFieldsX(Error& err, int64_t current,
+                                                    int64_t limit) {
   HeapObject map_obj = GetMap(err);
   if (err.Fail()) return nullptr;
 
@@ -2461,10 +2529,18 @@ internal_fileds_t* JSObject::InspectInternalFieldsX(Error& err) {
   for (int64_t off = v8()->js_object()->kInternalFieldsOffset;
        off < instance_size; off += v8()->common()->kPointerSize)
     ++length;
+
+  int64_t start = current;
+  if (start >= length) start = length;
+  int64_t end = length;
+  if (limit != 0) end = current + limit;
+  if (end >= length) end = length;
+
   internal_fileds_t* fields = new internal_fileds_t;
-  internal_filed_t** fieldtmp = new internal_filed_t*[length];
-  fields->length = length;
+  internal_filed_t** fieldtmp = new internal_filed_t*[end - start];
+  fields->length = end - start;
   fields->internal_fileds = fieldtmp;
+  fields->current = end;
   int64_t i = 0;
   for (int64_t off = v8()->js_object()->kInternalFieldsOffset;
        off < instance_size; off += v8()->common()->kPointerSize) {
@@ -2475,10 +2551,11 @@ internal_fileds_t* JSObject::InspectInternalFieldsX(Error& err) {
     }
 
     char tmp[128];
-    snprintf(tmp, sizeof(tmp), "    0x%016" PRIx64, field);
+    snprintf(tmp, sizeof(tmp), "0x%016" PRIx64, field);
     internal_filed_t* tmp2 = new internal_filed_t;
     tmp2->address = tmp;
-    if (i < length) fieldtmp[i++] = tmp2;
+    if (i < length && i >= start && i < end) fieldtmp[i - start] = tmp2;
+    if (i < length) i++;
   }
 
   return fields;
@@ -2573,7 +2650,8 @@ int64_t JSObject::GetElementsLength(Error& err) {
   return length_smi.GetValue();
 }
 
-elements_t* JSObject::InspectElementsX(Error& err) {
+elements_t* JSObject::InspectElementsX(Error& err, int64_t current,
+                                       int64_t limit) {
   HeapObject elements_obj = Elements(err);
   if (err.Fail()) return nullptr;
 
@@ -2583,7 +2661,7 @@ elements_t* JSObject::InspectElementsX(Error& err) {
   if (err.Fail()) return nullptr;
 
   int64_t length = length_smi.GetValue();
-  return InspectElementsX(length, err);
+  return InspectElementsX(length, err, current, limit);
 }
 
 
@@ -2727,7 +2805,8 @@ int64_t JSObject::GetPropertiesLength(Error& err) {
   }
 }
 
-properties_t* JSObject::InspectDictionaryX(Error& err) {
+properties_t* JSObject::InspectDictionaryX(Error& err, int64_t current,
+                                           int64_t limit) {
   HeapObject dictionary_obj = Properties(err);
   if (err.Fail()) return nullptr;
 
@@ -2739,11 +2818,18 @@ properties_t* JSObject::InspectDictionaryX(Error& err) {
 
   InspectOptions options;
 
+  int64_t start = current;
+  if (start >= length) start = length;
+  int64_t end = length;
+  if (limit != 0) end = current + limit;
+  if (end >= length) end = length;
+
   properties_t* properties = new properties_t;
-  property_t** property = new property_t*[length];
-  properties->length = static_cast<int>(length);
+  property_t** property = new property_t*[end - start];
+  properties->length = static_cast<int>(end - start);
   properties->properties = property;
-  for (int64_t i = 0; i < length; i++) {
+  properties->current = end;
+  for (int64_t i = start; i < end; i++) {
     Value key = dictionary.GetKey(i, err);
     if (err.Fail()) {
       delete properties;
@@ -2759,7 +2845,7 @@ properties_t* JSObject::InspectDictionaryX(Error& err) {
     }
 
     if (is_hole) {
-      property[i] = nullptr;
+      property[i - start] = nullptr;
       continue;
     }
 
@@ -2770,7 +2856,7 @@ properties_t* JSObject::InspectDictionaryX(Error& err) {
     }
 
     property_t* p = new property_t;
-    property[i] = p;
+    property[i - start] = p;
     p->key = key.ToString(err);
     if (err.Fail()) {
       delete properties;
@@ -2872,7 +2958,8 @@ std::string JSObject::InspectDescriptors(Map map, Error& err) {
   return res;
 }
 
-properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
+properties_t* JSObject::InspectDescriptorsX(Map map, Error& err,
+                                            int64_t current, int64_t limit) {
   HeapObject descriptors_obj = map.InstanceDescriptors(err);
   if (err.Fail()) return nullptr;
 
@@ -2894,11 +2981,18 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
 
   InspectOptions options;
 
+  int64_t start = current;
+  if (start >= own_descriptors_count) start = own_descriptors_count;
+  int64_t end = own_descriptors_count;
+  if (limit != 0) end = current + limit;
+  if (end >= own_descriptors_count) end = own_descriptors_count;
+
   properties_t* properties = new properties_t;
-  property_t** property = new property_t*[own_descriptors_count];
-  properties->length = static_cast<int>(own_descriptors_count);
+  property_t** property = new property_t*[end - start];
+  properties->length = static_cast<int>(end - start);
   properties->properties = property;
-  for (int64_t i = 0; i < own_descriptors_count; i++) {
+  properties->current = end;
+  for (int64_t i = start; i < end; i++) {
     Smi details = descriptors.GetDetails(i, err);
     if (err.Fail()) {
       delete properties;
@@ -2912,7 +3006,7 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
     }
 
     property_t* p = new property_t;
-    property[i] = p;
+    property[i - start] = p;
     p->key = key.ToString(err);
     if (err.Fail()) {
       delete properties;
@@ -2984,7 +3078,6 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err) {
   }
 
   return properties;
-  ;
 }
 
 
