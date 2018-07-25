@@ -286,21 +286,25 @@ class JSObject : public HeapObject {
   std::string Inspect(InspectOptions* options, Error& err);
   js_object_t* InspectX(InspectOptions* options, Error& err);
   std::string InspectInternalFields(Error& err);
-  internal_fileds_t* InspectInternalFieldsX(Error& err);
+  internal_fileds_t* InspectInternalFieldsX(Error& err, int64_t current = 0,
+                                            int64_t limit = 0);
   int64_t GetFieldsLength(Error& err);
   std::string InspectProperties(Error& err);
 
   std::string InspectElements(Error& err);
-  elements_t* InspectElementsX(Error& err);
+  elements_t* InspectElementsX(Error& err, int64_t current = 0,
+                               int64_t limit = 0);
   int64_t GetElementsLength(Error& err);
   std::string InspectElements(int64_t length, Error& err);
   elements_t* InspectElementsX(int64_t length, Error& err, int64_t current = 0,
                                int64_t limit = 0);
   std::string InspectDictionary(Error& err);
   int64_t GetPropertiesLength(Error& err);
-  properties_t* InspectDictionaryX(Error& err);
+  properties_t* InspectDictionaryX(Error& err, int64_t current = 0,
+                                   int64_t limit = 0);
   std::string InspectDescriptors(Map map, Error& err);
-  properties_t* InspectDescriptorsX(Map map, Error& err);
+  properties_t* InspectDescriptorsX(Map map, Error& err, int64_t current = 0,
+                                    int64_t limit = 0);
   void Keys(std::vector<std::string>& keys, Error& err);
 
   /** Return all the key/value pairs for properties on a JSObject

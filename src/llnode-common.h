@@ -111,9 +111,11 @@ typedef struct Property {
 
 typedef struct Properties {
   int length = 0;
+  int current = 0;
   property_t** properties = nullptr;
   ~Properties() {
     this->length = 0;
+    this->current = 0;
     delete[] this->properties;
     this->properties = nullptr;
   }
@@ -138,9 +140,11 @@ typedef struct InternalField {
 
 typedef struct InternalFields {
   int length = 0;
+  int current = 0;
   internal_filed_t** internal_fileds = nullptr;
   ~InternalFields() {
     this->length = 0;
+    this->current = 0;
     delete[] this->internal_fileds;
     this->internal_fileds = nullptr;
   }

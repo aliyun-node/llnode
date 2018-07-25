@@ -381,16 +381,25 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
                   Nan::New<Number>(js_object->properties_length));
       result->Set(Nan::New<String>("fields_length").ToLocalChecked(),
                   Nan::New<Number>(js_object->fields_length));
+      int current = 0;
 
-      if (js_object->elements != nullptr)
+      if (js_object->elements != nullptr) {
         result->Set(Nan::New<String>("elements").ToLocalChecked(),
                     GetElements(js_object->elements));
-      if (js_object->properties != nullptr)
+        current = js_object->elements->current;
+      }
+      if (js_object->properties != nullptr) {
         result->Set(Nan::New<String>("properties").ToLocalChecked(),
                     GetProperties(js_object->properties));
-      if (js_object->fields != nullptr)
+        current = js_object->properties->current;
+      }
+      if (js_object->fields != nullptr) {
         result->Set(Nan::New<String>("internal_fields").ToLocalChecked(),
                     GetInternalFields(js_object->fields));
+        current = js_object->fields->current;
+      }
+      result->Set(Nan::New<String>("current").ToLocalChecked(),
+                  Nan::New<Number>(current));
       break;
     }
     case InspectType::kHeapNumber: {
