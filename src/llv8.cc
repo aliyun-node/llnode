@@ -1639,7 +1639,7 @@ first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
   unsigned int len = options->length;
   if (options->current > val.length() - 1) {
     string->end = true;
-    string->current = val.length() - 1;
+    string->current = val.length();
     val = "";
   } else if (options->current != 0 && options->limit != 0) {
     int option_current = options->current;
@@ -1663,7 +1663,7 @@ first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
       string->end = false;
       string->current = len;
     } else {
-      string->current = val.length() - 1;
+      string->current = val.length();
       string->end = true;
     }
   }
