@@ -294,8 +294,10 @@ Local<Array> LLNode::GetInternalFields(internal_fileds_t* fieds) {
   if (fieds->internal_fileds != nullptr) {
     Local<Array> fields = Nan::New<Array>(fieds->length);
     for (int i = 0; i < fieds->length; ++i) {
-      fields->Set(i, Nan::New<String>((*(fieds->internal_fileds + i))->address)
-                         .ToLocalChecked());
+      uint64_t addr = std::strtoull(
+          (*(fieds->internal_fileds + i))->address.c_str(), nullptr, 16);
+      inspect_t* data = api->Inspect(addr, false);
+      fields->Set(i, InspectJsObject(data));
     }
     return fields;
   } else
@@ -382,21 +384,27 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
       result->Set(Nan::New<String>("fields_length").ToLocalChecked(),
                   Nan::New<Number>(js_object->fields_length));
       int current = 0;
+      int elements_length = 0;
+      int properties_length = 0;
+      int internal_fields_lenth = 9;
 
       if (js_object->elements != nullptr) {
         result->Set(Nan::New<String>("elements").ToLocalChecked(),
                     GetElements(js_object->elements));
-        current = js_object->elements->current;
+        elements_length = js_object->elements->current;
+        current = elements_length;
       }
       if (js_object->properties != nullptr) {
         result->Set(Nan::New<String>("properties").ToLocalChecked(),
                     GetProperties(js_object->properties));
-        current = js_object->properties->current;
+        properties_length = js_object->properties->current;
+        current = elements_length + properties_length;
       }
       if (js_object->fields != nullptr) {
         result->Set(Nan::New<String>("internal_fields").ToLocalChecked(),
                     GetInternalFields(js_object->fields));
-        current = js_object->fields->current;
+        internal_fields_lenth = js_object->fields->current;
+        current = elements_length + properties_length + internal_fields_lenth;
       }
       result->Set(Nan::New<String>("current").ToLocalChecked(),
                   Nan::New<Number>(current));
