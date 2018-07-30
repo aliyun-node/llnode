@@ -2398,7 +2398,8 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
         delete js_object;
         return nullptr;
       }
-    } else if (option_current < js_object->elements_length) {
+    } else if (option_current < js_object->elements_length &&
+               option_end >= js_object->elements_length) {
       HeapObject map_obj = GetMap(err);
       if (err.Fail()) {
         delete js_object;
@@ -2436,7 +2437,9 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
                                      js_object->properties_length,
                                  option_limit);
     } else if (option_current <
-               js_object->elements_length + js_object->properties_length) {
+                   js_object->elements_length + js_object->properties_length &&
+               option_end >=
+                   js_object->elements_length + js_object->properties_length) {
       js_object->fields =
           InspectInternalFieldsX(err, 0,
                                  option_end - js_object->elements_length -
