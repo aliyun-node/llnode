@@ -744,7 +744,7 @@ std::string JSFunction::GetSource(Error& err) {
   }
 
   String str(source);
-  std::string source_str = str.ToString(err, true);
+  std::string source_str = str.ToString(err);
 
   int64_t start_pos = info.StartPosition(err);
 
@@ -1032,7 +1032,7 @@ void Script::GetLineColumnFromPos(int64_t pos, int64_t& line, int64_t& column,
   }
 
   String str(source);
-  std::string source_str = str.ToString(err, true);
+  std::string source_str = str.ToString(err);
   int64_t limit = source_str.length();
   if (limit > pos) limit = pos;
 
@@ -1632,7 +1632,7 @@ unsigned long String::GetSubStr(unsigned long current, int limit,
 }
 
 first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
-  std::string val = ToString(err);
+  std::string val = ToString(err, false);
   if (err.Fail()) return nullptr;
   first_non_string_t* string = new first_non_string_t;
   string->type = kFirstNonstring;

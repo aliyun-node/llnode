@@ -169,7 +169,7 @@ class String : public HeapObject {
   inline int64_t Representation(Error& err);
   inline Smi Length(Error& err);
 
-  std::string ToString(Error& err, bool utf16 = false);
+  std::string ToString(Error& err, bool utf16 = true);
   std::string Inspect(InspectOptions* options, Error& err);
   unsigned long GetSubStr(unsigned long current, int limit, std::string val);
   first_non_string_t* InspectX(InspectOptions* options, Error& err);
@@ -233,7 +233,7 @@ class TwoByteString : public String {
  public:
   V8_VALUE_DEFAULT_METHODS(TwoByteString, String)
 
-  inline std::string ToString(Error& err, bool utf16 = false);
+  inline std::string ToString(Error& err, bool utf16 = true);
 };
 
 class ConsString : public String {
@@ -243,7 +243,7 @@ class ConsString : public String {
   inline String First(Error& err);
   inline String Second(Error& err);
 
-  inline std::string ToString(Error& err, bool utf16 = false);
+  inline std::string ToString(Error& err, bool utf16 = true);
 };
 
 class SlicedString : public String {
@@ -253,7 +253,7 @@ class SlicedString : public String {
   inline String Parent(Error& err);
   inline Smi Offset(Error& err);
 
-  inline std::string ToString(Error& err, bool utf16 = false);
+  inline std::string ToString(Error& err, bool utf16 = true);
 };
 
 class ThinString : public String {
@@ -262,7 +262,7 @@ class ThinString : public String {
 
   inline String Actual(Error& err);
 
-  inline std::string ToString(Error& err, bool utf16 = false);
+  inline std::string ToString(Error& err, bool utf16 = true);
 };
 
 class HeapNumber : public HeapObject {
@@ -539,7 +539,7 @@ class LLV8 {
                           int64_t end, Error& err);
   std::string LoadString(int64_t addr, int64_t length, Error& err);
   std::string LoadTwoByteString(int64_t addr, int64_t length, Error& err,
-                                bool utf16 = false);
+                                bool utf16 = true);
   std::string Utf16ToUtf8(const std::u16string& u16_str);
   uint8_t* LoadChunk(int64_t addr, int64_t length, Error& err);
 
