@@ -1533,6 +1533,9 @@ smi_t* Smi::InspectX(Error& err) {
   smi->type = kSmi;
   smi->name = "Smi";
   smi->value = ToString(err);
+  char tmp[128];
+  snprintf(tmp, sizeof(tmp), "0x%016" PRIx64, raw());
+  smi->address = tmp;
   return smi;
 }
 
@@ -2372,9 +2375,7 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
     }
 
     // add properties
-    if (option_current >= js_object->elements_length &&
-        option_current <
-            js_object->elements_length + js_object->properties_length) {
+    if (option_current >= js_object->elements_length) {
       HeapObject map_obj = GetMap(err);
       if (err.Fail()) {
         delete js_object;
@@ -2397,10 +2398,7 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
         delete js_object;
         return nullptr;
       }
-    } else if (option_current < js_object->elements_length &&
-               option_end >= js_object->elements_length &&
-               option_end <
-                   js_object->elements_length + js_object->properties_length) {
+    } else if (option_current < js_object->elements_length) {
       HeapObject map_obj = GetMap(err);
       if (err.Fail()) {
         delete js_object;
@@ -2438,12 +2436,7 @@ js_object_t* JSObject::InspectX(InspectOptions* options, Error& err) {
                                      js_object->properties_length,
                                  option_limit);
     } else if (option_current <
-                   js_object->elements_length + js_object->properties_length &&
-               option_end >=
-                   js_object->elements_length + js_object->properties_length &&
-               option_end < js_object->elements_length +
-                                js_object->properties_length +
-                                js_object->fields_length) {
+               js_object->elements_length + js_object->properties_length) {
       js_object->fields =
           InspectInternalFieldsX(err, 0,
                                  option_end - js_object->elements_length -
