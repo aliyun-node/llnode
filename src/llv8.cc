@@ -1656,8 +1656,8 @@ first_non_string_t* String::InspectX(InspectOptions* options, Error& err) {
       string->current = option_current + limit;
       string->end = false;
     } else {
-      val = val.substr(options->current);
       string->current = val.length();
+      val = val.substr(options->current);
       string->end = true;
     }
   } else {
