@@ -10,10 +10,14 @@
 #include <lldb/API/SBThread.h>
 #include <lldb/lldb-enumerations.h>
 
+#include <fstream>
+#include <iostream>
+
 #include "src/error.h"
 #include "src/llnode-api.h"
 #include "src/llnode-module.h"
 #include "src/llscan.h"
+#include "src/llv8-inl.h"
 #include "src/llv8.h"
 
 namespace llnode {
@@ -348,5 +352,23 @@ inspect_t* LLNodeApi::Inspect(uint64_t address, bool detailed,
   if (err.Fail() || result == nullptr) return nullptr;
   inspect_map.insert(InspectMap::value_type(key, result));
   return result;
+}
+
+bool LLNodeApi::ExportString(uint64_t address, char* file) {
+  v8::HeapObject heap_object(llscan->v8(), address);
+  Error err;
+  bool is_string = v8::String::IsString(llscan->v8(), heap_object, err);
+  if (err.Fail()) return false;
+  // not string
+  if (!is_string) return false;
+  v8::String non_string(heap_object);
+  string result = non_string.ToString(err, false);
+  if (err.Fail()) return false;
+  // open file stream
+  std::ofstream outfile(file);
+  outfile << result << std::endl;
+  outfile.flush();
+  outfile.close();
+  return true;
 }
 }  // namespace llnode

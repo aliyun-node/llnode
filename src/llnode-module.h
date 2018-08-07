@@ -48,6 +48,8 @@ class LLNode : public Nan::ObjectWrap {
   static void GetJsInstances(const Nan::FunctionCallbackInfo<Value>& info);
   static void InspectJsObjectAtAddress(
       const Nan::FunctionCallbackInfo<Value>& info);
+  static void ExportStringAtAddress(
+      const Nan::FunctionCallbackInfo<Value>& info);
   Local<Object> GetThreadInfoById(size_t thread_index, size_t curt, size_t limt,
                                   bool limit_is_number);
   Local<Object> InspectJsObject(inspect_t* inspect);

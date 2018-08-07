@@ -54,6 +54,7 @@ class LLNodeApi {
   std::string GetObject(uint64_t address, bool detailed);
   inspect_t* Inspect(uint64_t address, bool detailed, unsigned int current = 0,
                      unsigned int limit = 0);
+  bool ExportString(uint64_t address, char* file);
 
  private:
   LLNode* llnode;
