@@ -82,6 +82,7 @@ void LLNode::Init(Local<Object> exports) {
   Nan::SetPrototypeMethod(tpl, "getJsInstances", GetJsInstances);
   Nan::SetPrototypeMethod(tpl, "inspectJsObjectAtAddress",
                           InspectJsObjectAtAddress);
+  Nan::SetPrototypeMethod(tpl, "exportStringAtAddress", ExportStringAtAddress);
   // return js class
   constructor.Reset(tpl->GetFunction());
   exports->Set(Nan::New("LLNode").ToLocalChecked(), tpl->GetFunction());
@@ -753,5 +754,24 @@ void LLNode::InspectJsObjectAtAddress(
   }
   Local<Object> result = llnode->InspectJsObject(inspect);
   info.GetReturnValue().Set(result);
+}
+
+void LLNode::ExportStringAtAddress(
+    const Nan::FunctionCallbackInfo<Value>& info) {
+  Nan::Utf8String address_str(info[0]);
+  Nan::Utf8String full_file_path(info[1]);
+  if ((*address_str)[0] != '0' || (*address_str)[1] != 'x' ||
+      address_str.length() > 18) {
+    Nan::ThrowTypeError("Invalid address");
+    return;
+  }
+  if ((*full_file_path)[0] != '/') {
+    Nan::ThrowTypeError("Invalid full file path");
+    return;
+  }
+  LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
+  uint64_t addr = std::strtoull(*address_str, nullptr, 16);
+  bool export_string = llnode->api->ExportString(addr, *full_file_path);
+  info.GetReturnValue().Set(Nan::New<Boolean>(export_string));
 }
 }  // namespace llnode
