@@ -11,9 +11,9 @@
 namespace llnode {
 namespace v8 {
 
-using lldb::addr_t;
 using lldb::SBError;
 using lldb::SBTarget;
+using lldb::addr_t;
 
 static std::string kConstantPrefix = "v8dbg_";
 
@@ -2904,7 +2904,8 @@ std::string JSObject::InspectDescriptors(Map map, Error& err) {
     res += "    ." + key.ToString(err) + "=";
     if (err.Fail()) return std::string();
 
-    if (descriptors.IsConstFieldDetails(details) || descriptors.IsDescriptorDetails(details)) {
+    if (descriptors.IsConstFieldDetails(details) ||
+        descriptors.IsDescriptorDetails(details)) {
       Value value;
 
       value = descriptors.GetValue(i, err);
@@ -3001,7 +3002,8 @@ properties_t* JSObject::InspectDescriptorsX(Map map, Error& err,
       return nullptr;
     }
 
-    if (descriptors.IsConstFieldDetails(details)) {
+    if (descriptors.IsConstFieldDetails(details) ||
+        descriptors.IsDescriptorDetails(details)) {
       Value value;
 
       value = descriptors.GetValue(i, err);
@@ -3175,7 +3177,8 @@ std::vector<std::pair<Value, Value>> JSObject::DescriptorEntries(Map map,
     Value key = descriptors.GetKey(i, err);
     if (err.Fail()) continue;
 
-    if (descriptors.IsConstFieldDetails(details)) {
+    if (descriptors.IsConstFieldDetails(details) ||
+        descriptors.IsDescriptorDetails(details)) {
       Value value;
 
       value = descriptors.GetValue(i, err);
@@ -3381,7 +3384,8 @@ Value JSObject::GetDescriptorProperty(std::string key_name, Map map,
     // Found the right key, get the value.
     if (err.Fail()) return Value();
 
-    if (descriptors.IsConstFieldDetails(details)) {
+    if (descriptors.IsConstFieldDetails(details) ||
+        descriptors.IsDescriptorDetails(details)) {
       Value value;
 
       value = descriptors.GetValue(i, err);
