@@ -69,9 +69,14 @@ class Value {
         : detailed(false),
           print_map(false),
           print_source(false),
-          length(kLength) {}
+          length(kLength),
+          indent_depth(1) {}
 
     static const unsigned int kLength = 16;
+    static const unsigned int kIndentSize = 2;
+    inline std::string get_indent_spaces() {
+      return std::string(indent_depth * kIndentSize, ' ');
+    }
 
     bool detailed;
     bool print_map;
@@ -80,6 +85,7 @@ class Value {
     unsigned int current = 0;
     unsigned int limit = 0;
     int64_t start_address;
+    unsigned int indent_depth;
   };
 
   Value(const Value& v) = default;
@@ -445,8 +451,8 @@ class Context : public FixedArray {
   inline T GetEmbedderData(int64_t index, Error& err);
   inline Value ContextSlot(int index, Error& err);
 
-  std::string Inspect(Error& err);
   context_t* InspectX(Error& err);
+  std::string Inspect(InspectOptions *options, Error& err);
 
  private:
   inline JSFunction Closure(Error& err);
