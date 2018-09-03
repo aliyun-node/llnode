@@ -14,6 +14,7 @@ namespace llnode {
 class LLScan;
 
 typedef std::vector<uint64_t> ReferencesVector;
+typedef std::vector<uint64_t> ContextVector;
 
 typedef std::map<uint64_t, ReferencesVector*> ReferencesByValueMap;
 typedef std::map<std::string, ReferencesVector*> ReferencesByPropertyMap;
@@ -92,6 +93,9 @@ class FindReferencesCmd : public CommandBase {
     virtual void PrintRefs(lldb::SBCommandReturnObject& result, v8::String& str,
                            Error& err) {}
 
+    virtual void PrintContextRefs(lldb::SBCommandReturnObject& result,
+                                  Error& err) {}
+
     static const char* const property_reference_template;
     static const char* const array_reference_template;
   };
@@ -117,6 +121,9 @@ class FindReferencesCmd : public CommandBase {
                    Error& err) override;
     void PrintRefs(lldb::SBCommandReturnObject& result, v8::String& str,
                    Error& err) override;
+
+    void PrintContextRefs(lldb::SBCommandReturnObject& result,
+                          Error& err) override;
 
    private:
     LLScan* llscan_;
@@ -326,6 +333,7 @@ class LLScan {
     return references_by_value_[address];
   };
 
+  // References By Property
   inline bool AreReferencesByPropertyLoaded() {
     return references_by_property_.size() > 0;
   };
@@ -336,6 +344,7 @@ class LLScan {
     return references_by_property_[property];
   };
 
+  // References By String
   inline bool AreReferencesByStringLoaded() {
     return references_by_string_.size() > 0;
   };
@@ -345,6 +354,10 @@ class LLScan {
     }
     return references_by_string_[string_value];
   };
+
+  // Contexts
+  inline bool AreContextsLoaded() { return contexts_.size() > 0; };
+  inline ContextVector* GetContexts() { return &contexts_; }
 
   v8::LLV8* llv8_;
   LLNode* llnode_;
@@ -375,6 +388,7 @@ class LLScan {
   ReferencesByValueMap references_by_value_;
   ReferencesByPropertyMap references_by_property_;
   ReferencesByStringMap references_by_string_;
+  ContextVector contexts_;
 };
 
 }  // namespace llnode
