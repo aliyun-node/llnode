@@ -532,9 +532,15 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
                   Nan::New<String>(context->previous_address).ToLocalChecked());
       result->Set(Nan::New<String>("closure_address").ToLocalChecked(),
                   Nan::New<String>(context->closure_address).ToLocalChecked());
+      result->Set(
+          Nan::New<String>("scope_info_address").ToLocalChecked(),
+          Nan::New<String>(context->scope_info_address).ToLocalChecked());
       if (context->closure != nullptr)
         result->Set(Nan::New<String>("closure").ToLocalChecked(),
                     InspectJsObject(context->closure));
+      if (context->may_be_function != nullptr)
+        result->Set(Nan::New<String>("may_be_function").ToLocalChecked(),
+                    InspectJsObject(context->may_be_function));
       if (context->scope_object != nullptr)
         result->Set(Nan::New<String>("scope_object").ToLocalChecked(),
                     GetProperties(context->scope_object));

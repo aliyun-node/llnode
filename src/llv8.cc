@@ -11,9 +11,9 @@
 namespace llnode {
 namespace v8 {
 
+using lldb::addr_t;
 using lldb::SBError;
 using lldb::SBTarget;
-using lldb::addr_t;
 
 static std::string kConstantPrefix = "v8dbg_";
 
@@ -697,10 +697,15 @@ js_function_t* JSFunction::InspectX(InspectOptions* options, Error& err) {
     char tmp[128];
     snprintf(tmp, sizeof(tmp), "0x%016" PRIx64, context.raw());
     js_function->context_address = tmp;
-    js_function->context = context.InspectX(err);
-    if (err.Fail()) {
-      delete js_function;
-      return nullptr;
+    {
+      InspectOptions ctx_options;
+      ctx_options.detailed = true;
+      ctx_options.indent_depth = options->indent_depth + 1;
+      js_function->context = context.InspectX(&ctx_options, err);
+      if (err.Fail()) {
+        delete js_function;
+        return nullptr;
+      }
     }
 
     if (options->print_source) {
@@ -1386,6 +1391,20 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
     return string;
   }
 
+  if (type >= v8()->types()->kFirstContextType &&
+      type <= v8()->types()->kLastContextType) {
+    Context ctx(this);
+    context_t* context = ctx.InspectX(options, err);
+    if (context == nullptr) {
+      delete context;
+      return nullptr;
+    }
+    context->map_address = inspect->map_address;
+    context->address = inspect->address;
+    delete inspect;
+    return context;
+  }
+
   if (type == v8()->types()->kFixedArrayType) {
     FixedArray arr(this);
     fixed_array_t* fixed_array = arr.InspectX(options, err);
@@ -1808,7 +1827,10 @@ std::string Context::Inspect(InspectOptions* options, Error& err) {
   HeapObject heap_previous = HeapObject(previous);
   if (heap_previous.Check()) {
     char tmp[128];
-    snprintf(tmp, sizeof(tmp), (options->get_indent_spaces() + "(previous)=0x%016" PRIx64).c_str(), previous.raw());
+    snprintf(
+        tmp, sizeof(tmp),
+        (options->get_indent_spaces() + "(previous)=0x%016" PRIx64).c_str(),
+        previous.raw());
     res += std::string(tmp) + ":<Context>,";
   }
 
@@ -1818,8 +1840,10 @@ std::string Context::Inspect(InspectOptions* options, Error& err) {
     JSFunction closure = Closure(err);
     if (err.Fail()) return std::string();
     char tmp[128];
-    snprintf(tmp, sizeof(tmp), (options->get_indent_spaces() + "(closure)=0x%016" PRIx64 " {").c_str(),
-             closure.raw());
+    snprintf(
+        tmp, sizeof(tmp),
+        (options->get_indent_spaces() + "(closure)=0x%016" PRIx64 " {").c_str(),
+        closure.raw());
     res += tmp;
 
     InspectOptions closure_options;
@@ -1827,13 +1851,16 @@ std::string Context::Inspect(InspectOptions* options, Error& err) {
     if (err.Fail()) return std::string();
   } else {
     char tmp[128];
-    snprintf(tmp, sizeof(tmp), (options->get_indent_spaces() + "(scope_info)=0x%016" PRIx64).c_str(),
-             scope.raw());
+    snprintf(
+        tmp, sizeof(tmp),
+        (options->get_indent_spaces() + "(scope_info)=0x%016" PRIx64).c_str(),
+        scope.raw());
 
     res += std::string(tmp) + ":<ScopeInfo";
 
     Error function_name_error;
-    HeapObject maybe_function_name = scope.MaybeFunctionName(function_name_error);
+    HeapObject maybe_function_name =
+        scope.MaybeFunctionName(function_name_error);
 
     if (function_name_error.Success()) {
       res += ": for function " + String(maybe_function_name).ToString(err);
@@ -1865,22 +1892,24 @@ std::string Context::Inspect(InspectOptions* options, Error& err) {
   return res + "}>";
 }
 
-context_t* Context::InspectX(Error& err) {
+context_t* Context::InspectX(InspectOptions* options, Error& err) {
   // Not enough postmortem information, return bare minimum
   if (v8()->shared_info()->kScopeInfoOffset == -1 &&
       v8()->shared_info()->kNameOrScopeInfoOffset == -1)
     return nullptr;
 
+  context_t* context = new context_t;
+  context->type = kContext;
+  context->name = "Context";
+
+  if (!options->detailed) {
+    return context;
+  }
+
   Value previous = Previous(err);
   if (err.Fail()) return nullptr;
 
-  JSFunction closure = Closure(err);
-  if (err.Fail()) return nullptr;
-
-  SharedFunctionInfo info = closure.Info(err);
-  if (err.Fail()) return nullptr;
-
-  HeapObject scope_obj = info.GetScopeInfo(err);
+  HeapObject scope_obj = GetScopeInfo(err);
   if (err.Fail()) return nullptr;
 
   ScopeInfo scope(scope_obj);
@@ -1892,11 +1921,6 @@ context_t* Context::InspectX(Error& err) {
   Smi local_count_smi = scope.ContextLocalCount(err);
   if (err.Fail()) return nullptr;
 
-  InspectOptions options;
-
-  context_t* context = new context_t;
-  context->type = kContext;
-  context->name = "Context";
   HeapObject heap_previous = HeapObject(previous);
   if (heap_previous.Check()) {
     char tmp[128];
@@ -1904,14 +1928,31 @@ context_t* Context::InspectX(Error& err) {
     context->previous_address = tmp;
   }
 
-  {
+  if (v8()->context()->hasClosure()) {
+    JSFunction closure = Closure(err);
+    if (err.Fail()) return nullptr;
     char tmp[128];
     snprintf(tmp, sizeof(tmp), "0x%016" PRIx64, closure.raw());
     context->closure_address = tmp;
 
-    InspectOptions options;
-    context->closure = closure.InspectX(&options, err);
+    InspectOptions closure_options;
+    context->closure = closure.InspectX(&closure_options, err);
     if (err.Fail()) {
+      delete context;
+      return nullptr;
+    }
+  } else {
+    char tmp[128];
+    snprintf(tmp, sizeof(tmp), "0x%016" PRIx64, scope.raw());
+    context->scope_info_address = tmp;
+
+    Error function_name_error;
+    HeapObject maybe_function_name =
+        scope.MaybeFunctionName(function_name_error);
+    InspectOptions may_be_function_options;
+    context->may_be_function = maybe_function_name.InspectX(
+        &may_be_function_options, function_name_error);
+    if (function_name_error.Fail()) {
       delete context;
       return nullptr;
     }
@@ -1946,7 +1987,8 @@ context_t* Context::InspectX(Error& err) {
       return nullptr;
     }
 
-    object->value = value.InspectX(&options, err);
+    InspectOptions val_options;
+    object->value = value.InspectX(&val_options, err);
     if (err.Fail()) {
       delete context;
       return nullptr;

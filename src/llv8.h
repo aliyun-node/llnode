@@ -451,8 +451,8 @@ class Context : public FixedArray {
   inline T GetEmbedderData(int64_t index, Error& err);
   inline Value ContextSlot(int index, Error& err);
 
-  context_t* InspectX(Error& err);
-  std::string Inspect(InspectOptions *options, Error& err);
+  context_t* InspectX(InspectOptions* options, Error& err);
+  std::string Inspect(InspectOptions* options, Error& err);
 
  private:
   inline JSFunction Closure(Error& err);

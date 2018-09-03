@@ -239,13 +239,18 @@ typedef struct JsFunction : inspect_t {
 typedef struct Context : inspect_t {
   std::string previous_address = "";
   std::string closure_address = "";
+  std::string scope_info_address = "";
   inspect_t* closure = nullptr;
+  inspect_t* may_be_function = nullptr;
   properties_t* scope_object = nullptr;
   ~Context() {
     this->previous_address = "";
     this->closure_address = "";
+    this->scope_info_address = "";
     delete this->closure;
     this->closure = nullptr;
+    delete this->may_be_function;
+    this->may_be_function = nullptr;
     delete this->scope_object;
     this->scope_object = nullptr;
   }
