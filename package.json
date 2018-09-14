@@ -1,6 +1,6 @@
 {
   "name": "@alicloud/llnode-api",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "description": "An lldb plugin for Node.js and V8, which enables inspection of JavaScript states for insights into Node.js processes and their core dumps.",
   "main": "index.js",
   "directories": {
