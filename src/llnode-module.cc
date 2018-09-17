@@ -83,6 +83,7 @@ void LLNode::Init(Local<Object> exports) {
   Nan::SetPrototypeMethod(tpl, "inspectJsObjectAtAddress",
                           InspectJsObjectAtAddress);
   Nan::SetPrototypeMethod(tpl, "exportStringAtAddress", ExportStringAtAddress);
+  Nan::SetPrototypeMethod(tpl, "heapdump", Heapdump);
   // return js class
   constructor.Reset(tpl->GetFunction());
   exports->Set(Nan::New("LLNode").ToLocalChecked(), tpl->GetFunction());
@@ -779,5 +780,16 @@ void LLNode::ExportStringAtAddress(
   uint64_t addr = std::strtoull(*address_str, nullptr, 16);
   bool export_string = llnode->api->ExportString(addr, *full_file_path);
   info.GetReturnValue().Set(Nan::New<Boolean>(export_string));
+}
+
+void LLNode::Heapdump(const Nan::FunctionCallbackInfo<Value>& info) {
+  if(!info[0]->IsString()) {
+    Nan::ThrowTypeError("heapdump path must be string");
+    return;
+  }
+  Nan::Utf8String heapdump_path(info[0]);
+  LLNode* llnode = ObjectWrap::Unwrap<LLNode>(info.Holder());
+  int result = llnode->api->Heapdump(*heapdump_path);
+  info.GetReturnValue().Set(Nan::New<Number>(result));
 }
 }  // namespace llnode

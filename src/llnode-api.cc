@@ -371,4 +371,9 @@ bool LLNodeApi::ExportString(uint64_t address, char* file) {
   outfile.close();
   return true;
 }
+
+int LLNodeApi::Heapdump(char* file) {
+  
+  return 0;
+}
 }  // namespace llnode
