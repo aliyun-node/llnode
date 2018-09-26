@@ -22,6 +22,16 @@ typedef std::map<std::string, ReferencesVector*> ReferencesByStringMap;
 
 typedef void(HeapScanMonitor)(LLNode* llnode, uint32_t now, uint32_t total);
 
+// New type defining pagination options
+// It should be feasible to use it to any commands that output
+// a list of information
+struct cmd_pagination_t {
+  int total_entries = 0;
+  int current_page = 0;
+  int output_limit = 0;
+  std::string command = "";
+};
+
 char** ParseInspectOptions(char** cmd, v8::Value::InspectOptions* options);
 
 class FindObjectsCmd : public CommandBase {
@@ -42,7 +52,8 @@ class FindObjectsCmd : public CommandBase {
 class FindInstancesCmd : public CommandBase {
  public:
   FindInstancesCmd(LLScan* llscan, bool detailed)
-      : llscan_(llscan), detailed_(detailed) {}
+      : llscan_(llscan), detailed_(detailed) {
+  }
   ~FindInstancesCmd() override {}
 
   bool DoExecute(lldb::SBDebugger d, char** cmd,
@@ -51,6 +62,7 @@ class FindInstancesCmd : public CommandBase {
  private:
   LLScan* llscan_;
   bool detailed_;
+  cmd_pagination_t pagination_;
 };
 
 class NodeInfoCmd : public CommandBase {

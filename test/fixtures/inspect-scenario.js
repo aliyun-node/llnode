@@ -24,6 +24,7 @@ function closure() {
     this.hashmap = {};
   }
 
+
   Class.prototype.method = function method() {
     throw new Error('Uncaught');
   };
@@ -76,6 +77,13 @@ function closure() {
   c.hashmap.scoped = function name() {
     return scopedVar + outerVar + scopedAPI + scopedArray;
   };
+
+  function Class_B() {
+    this.name = "Class B";
+  }
+
+  const arr = new Array();
+  for(let i=0; i < 10; i++) arr.push(new Class_B());
 
   c.method();
 }
