@@ -17,7 +17,7 @@ const llnode = new LLNode('/Users/yijun/Downloads/u-39a50b14-9319-4b0f-8863-679b
   '/Users/yijun/Downloads/u-fbddb08d-9198-4169-9f45-4793a1d226ac-u-linux.3.11.2.node', {
     heap_scan_monitor: function (now, total) {
       let percentage = parseInt(now / total * 100);
-      console.log(12333, percentage);
+      console.log(`scan: ${percentage}%`);
     }
   });
 

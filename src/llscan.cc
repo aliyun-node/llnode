@@ -1293,7 +1293,8 @@ bool FindJSObjectsVisitor::IsAHistogramType(v8::Map& map, Error& err) {
 
 bool LLScan::ScanHeapForObjects(lldb::SBTarget target,
                                 lldb::SBCommandReturnObject& result,
-                                HeapScanMonitor* scan) {
+                                HeapScanMonitor* scan,
+                                bool dump) {
   /* Check the last scan is still valid - the process hasn't moved
    * and we haven't changed target.
    */

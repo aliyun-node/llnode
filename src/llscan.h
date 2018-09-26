@@ -306,7 +306,8 @@ class LLScan {
 
   bool ScanHeapForObjects(lldb::SBTarget target,
                           lldb::SBCommandReturnObject& result,
-                          HeapScanMonitor* scan = nullptr);
+                          HeapScanMonitor* scan = nullptr,
+                          bool dump = false);
   bool GenerateMemoryRanges(lldb::SBTarget target,
                             const char* segmentsfilename);
 
