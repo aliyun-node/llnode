@@ -305,7 +305,7 @@ string** LLNodeApi::GetTypeInstances(size_t type_index, int type) {
   }
   uint32_t length = objet_types[type_index]->GetInstanceCount();
   string** instances = new string*[length];
-  std::set<uint64_t> list = objet_types[type_index]->GetInstances();
+  std::unordered_set<uint64_t> list = objet_types[type_index]->GetInstances();
   uint32_t index = 0;
   for (auto it = list.begin(); it != list.end(); ++it) {
     char buf[20];
