@@ -1301,7 +1301,16 @@ inspect_t* HeapObject::InspectX(InspectOptions* options, Error& err) {
   }
   if (type >= v8()->types()->kFirstContextType &&
       type <= v8()->types()->kLastContextType) {
-    return "Context";
+    Context ctx(this);
+    context_t* context = ctx.InspectX(options, err);
+    if(context == nullptr) {
+      delete inspect;
+      return nullptr;
+    }
+    context->map_address = inspect->map_address;
+    context->address = inspect->address;
+    delete inspect;
+    return context;
   }
 
   if (JSObject::IsObjectType(v8(), type)) {
