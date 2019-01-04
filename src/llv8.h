@@ -143,6 +143,8 @@ class HeapObject : public Value {
   std::string Inspect(InspectOptions* options, Error& err);
   inspect_t* InspectX(InspectOptions* options, Error& err);
   std::string GetTypeName(Error& err);
+
+  inline bool IsJSErrorType(Error& err);
 };
 
 class Map : public HeapObject {
@@ -290,6 +292,7 @@ class JSObject : public HeapObject {
   inline HeapObject Elements(Error& err);
 
   std::string Inspect(InspectOptions* options, Error& err);
+  virtual std::string InspectAllProperties(InspectOptions* options, Error& err);
   js_object_t* InspectX(InspectOptions* options, Error& err);
   std::string InspectInternalFields(Error& err);
   internal_fileds_t* InspectInternalFieldsX(Error& err, int64_t current = 0,
@@ -335,6 +338,15 @@ class JSObject : public HeapObject {
   std::vector<std::pair<Value, Value>> DescriptorEntries(Map map, Error& err);
   Value GetDictionaryProperty(std::string key_name, Error& err);
   Value GetDescriptorProperty(std::string key_name, Map map, Error& err);
+};
+
+class JSError : public JSObject {
+ public:
+  V8_VALUE_DEFAULT_METHODS(JSError, JSObject);
+
+  js_error_t* InspectX(InspectOptions* options, Error& err);
+  std::string InspectAllProperties(InspectOptions* options,
+                                   Error& err) override;
 };
 
 class JSArray : public JSObject {
@@ -646,6 +658,7 @@ class LLV8 {
   friend class ThinString;
   friend class HeapNumber;
   friend class JSObject;
+  friend class JSError;
   friend class JSArray;
   friend class FixedArrayBase;
   friend class FixedArray;

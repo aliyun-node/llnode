@@ -411,6 +411,51 @@ Local<Object> LLNode::InspectJsObject(inspect_t* inspect) {
                   Nan::New<Number>(current));
       break;
     }
+    case InspectType::kJsError: {
+      js_error_t* js_error = static_cast<js_error_t*>(inspect);
+      result->Set(Nan::New<String>("constructor").ToLocalChecked(),
+                  Nan::New<String>(js_error->constructor).ToLocalChecked());
+      result->Set(Nan::New<String>("elements_length").ToLocalChecked(),
+                  Nan::New<Number>(js_error->elements_length));
+      result->Set(Nan::New<String>("properties_length").ToLocalChecked(),
+                  Nan::New<Number>(js_error->properties_length));
+      result->Set(Nan::New<String>("fields_length").ToLocalChecked(),
+                  Nan::New<Number>(js_error->fields_length));
+      result->Set(Nan::New<String>("stack_length").ToLocalChecked(),
+                  Nan::New<Number>(js_error->stack_length));
+      int current = 0;
+      int elements_length = 0;
+      int properties_length = 0;
+      int internal_fields_lenth = 9;
+
+      if (js_error->elements != nullptr) {
+        result->Set(Nan::New<String>("elements").ToLocalChecked(),
+                    GetElements(js_error->elements));
+        elements_length = js_error->elements->current;
+        current = elements_length;
+      }
+      if (js_error->properties != nullptr) {
+        result->Set(Nan::New<String>("properties").ToLocalChecked(),
+                    GetProperties(js_error->properties));
+        properties_length = js_error->properties->current;
+        current = elements_length + properties_length;
+      }
+      if (js_error->fields != nullptr) {
+        result->Set(Nan::New<String>("internal_fields").ToLocalChecked(),
+                    GetInternalFields(js_error->fields));
+        internal_fields_lenth = js_error->fields->current;
+        current = elements_length + properties_length + internal_fields_lenth;
+      }
+      if (js_error->stacks != nullptr) {
+        Local<Array> error_stack = Nan::New<Array>(js_error->stack_length);
+        for(int i = 0; i < js_error->stack_length; i++)
+          error_stack->Set(i, Nan::New<String>(js_error->stacks[i]).ToLocalChecked());
+        result->Set(Nan::New<String>("error_stack").ToLocalChecked(), error_stack);
+      }
+      result->Set(Nan::New<String>("current").ToLocalChecked(),
+                  Nan::New<Number>(current));
+      break;
+    }
     case InspectType::kHeapNumber: {
       heap_number_t* heap_number = static_cast<heap_number_t*>(inspect);
       result->Set(Nan::New<String>("value").ToLocalChecked(),

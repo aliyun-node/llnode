@@ -14,6 +14,7 @@ enum InspectType {
   kMap,
   kFixedArray,
   kJsObject,
+  kJsError,
   kHeapNumber,
   kJsArray,
   kOddball,
@@ -199,6 +200,16 @@ typedef struct JsObject : inspect_t {
     this->fields = nullptr;
   }
 } js_object_t;
+
+typedef struct JsError : js_object_t {
+  int stack_length = 0;
+  std::string* stacks = nullptr;
+  ~JsError() {
+    this->stack_length = 0;
+    delete this->stacks;
+    this->stacks = nullptr;
+  }
+} js_error_t;
 
 typedef struct HeapNumber : inspect_t {
   std::string value = "";
