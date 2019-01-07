@@ -503,14 +503,9 @@ class Context : public FixedArray {
       inline Iterator(int current, Locals* outer)
           : current_(current), outer_(outer){};
 
-      String LocalName(Error& err) {
-        return outer_->scope_info_.ContextLocalName(
-            current_, outer_->param_count_, outer_->stack_count_, err);
-      }
+      String LocalName(Error& err);
 
-      Value GetValue(Error& err) {
-        return outer_->context_->ContextSlot(current_, err);
-      }
+      Value GetValue(Error& err);
 
      private:
       int current_;

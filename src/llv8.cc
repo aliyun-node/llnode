@@ -1865,6 +1865,15 @@ v8::Value Context::Locals::Iterator::operator*() {
   return outer_->context_->ContextSlot(current_, err);
 }
 
+String Context::Locals::Iterator::LocalName(Error& err) {
+  return outer_->scope_info_.ContextLocalName(current_, outer_->param_count_,
+                                              outer_->stack_count_, err);
+}
+
+Value Context::Locals::Iterator::GetValue(Error& err) {
+  return outer_->context_->ContextSlot(current_, err);
+}
+
 std::string Context::Inspect(InspectOptions* options, Error& err) {
   // Not enough postmortem information, return bare minimum
   if (v8()->shared_info()->kScopeInfoOffset == -1 &&
