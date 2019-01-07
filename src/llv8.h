@@ -169,6 +169,15 @@ class Map : public HeapObject {
   HeapObject Constructor(Error& err);
 };
 
+class Symbol : public HeapObject {
+ public:
+  V8_VALUE_DEFAULT_METHODS(Symbol, HeapObject)
+
+  HeapObject Name(Error& err);
+
+  std::string ToString(Error& err);
+};
+
 class String : public HeapObject {
  public:
   V8_VALUE_DEFAULT_METHODS(String, HeapObject)
@@ -641,6 +650,7 @@ class LLV8 {
   constants::DescriptorArray descriptor_array;
   constants::NameDictionary name_dictionary;
   constants::Frame frame;
+  constants::Symbol symbol;
   constants::Types types;
 
   friend class Value;
@@ -675,6 +685,7 @@ class LLV8 {
   friend class JSRegExp;
   friend class JSDate;
   friend class CodeMap;
+  friend class Symbol;
   friend class llnode::FindJSObjectsVisitor;
   friend class llnode::FindObjectsCmd;
   friend class llnode::FindReferencesCmd;

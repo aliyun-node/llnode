@@ -481,6 +481,9 @@ void Frame::Load() {
   kStubFrame = LoadConstant("frametype_StubFrame");
 }
 
+void Symbol::Load() {
+  kNameOffset = LoadConstant("class_Symbol__name__Object");
+}
 
 void Types::Load() {
   kFirstNonstringType = LoadConstant("FirstNonstringType");
@@ -513,6 +516,7 @@ void Types::Load() {
       LoadConstant("type_SharedFunctionInfo__SHARED_FUNCTION_INFO_TYPE");
   kScriptType = LoadConstant("type_Script__SCRIPT_TYPE");
   kScopeInfoType = LoadConstant("type_ScopeInfo__SCOPE_INFO_TYPE");
+  kSymbolType = LoadConstant("type_Symbol__SYMBOL_TYPE");
 
   if (kJSAPIObjectType == -1) {
     common_->Load();
